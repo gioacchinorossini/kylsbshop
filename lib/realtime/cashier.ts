@@ -1,5 +1,5 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabaseClient } from '../supabase/client';
+import { supabaseClient, isSupabaseConfigured } from '../supabase/client';
 import { Order } from '@/types/database';
 
 export interface CashierRealtimeHandlers {
@@ -13,6 +13,13 @@ export interface CashierRealtimeHandlers {
  * Subscribes the Cashier Terminal to real-time order updates on the `orders` table.
  */
 export function subscribeToCashierRealtime(handlers: CashierRealtimeHandlers): () => void {
+  if (!isSupabaseConfigured) {
+    if (handlers.onStatusChange) {
+      handlers.onStatusChange('CLOSED');
+    }
+    return () => {};
+  }
+
   const channel: RealtimeChannel = supabaseClient
     .channel('cashier-pos-realtime')
     .on(

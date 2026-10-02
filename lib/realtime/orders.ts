@@ -1,5 +1,5 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabaseClient } from '../supabase/client';
+import { supabaseClient, isSupabaseConfigured } from '../supabase/client';
 import { Order } from '@/types/database';
 
 export interface OrdersRealtimeHandlers {
@@ -13,6 +13,13 @@ export interface OrdersRealtimeHandlers {
  * Subscribes to real-time order updates on the `orders` table for the Orders Tracker page.
  */
 export function subscribeToOrdersRealtime(handlers: OrdersRealtimeHandlers): () => void {
+  if (!isSupabaseConfigured) {
+    if (handlers.onStatusChange) {
+      handlers.onStatusChange('CLOSED');
+    }
+    return () => {};
+  }
+
   const channel: RealtimeChannel = supabaseClient
     .channel('orders-tracker-realtime')
     .on(
