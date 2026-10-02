@@ -1,14 +1,15 @@
 "use client";
 
 import { Suspense, useEffect, useTransition, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import Link from "next/link";
 import {
-  ShoppingCart, Plus, Minus, X, Flame, Leaf, ChevronDown, CheckCircle,
+  ShoppingCart, Plus, Minus, X, Flame, Leaf, ChevronDown, CheckCircle, ReceiptText,
 } from "lucide-react";
-import { Category, MenuItem, DiningTable, Order } from "@/types/database";
+import { Category, MenuItem, Order } from "@/types/database";
 import { getCategoriesAction, getMenuItemsAction } from "@/app/actions/menu";
 import { getTablesAction } from "@/app/actions/tables";
 import { createOrderAction } from "@/app/actions/orders";
@@ -284,9 +285,9 @@ function CartDrawer({
 
 // ─── Success Modal ─────────────────────────────────────────────────────────
 function SuccessModal({
-  order, theme, rawTableNumber, onClose,
+  order, theme, brand = "kyles-eatery", rawTableNumber, onClose,
 }: {
-  order: Order; theme: Theme; rawTableNumber: string; onClose: () => void;
+  order: Order; theme: Theme; brand?: string; rawTableNumber: string; onClose: () => void;
 }) {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const items = order.order_items ?? [];
@@ -399,14 +400,27 @@ function SuccessModal({
             )}
           </AnimatePresence>
 
-          {/* CTA */}
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={onClose}
-            className={cn("w-full py-3.5 rounded-2xl text-sm font-bold transition", theme.submitBtn)}
-          >
-            Order More
-          </motion.button>
+          {/* CTA Buttons */}
+          <div className="space-y-2.5 pt-1">
+            <Link
+              href={`/status?order=${order.id}&brand=${brand}`}
+              className={cn(
+                "w-full py-3.5 rounded-2xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm",
+                theme.submitBtn
+              )}
+            >
+              <ReceiptText size={16} />
+              Track My Order
+            </Link>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={onClose}
+              className={cn("w-full py-3 rounded-2xl text-sm font-semibold transition", theme.cancelBtn)}
+            >
+              Order More
+            </motion.button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
@@ -431,9 +445,10 @@ export default function CustomerHomePage() {
   );
 }
 
-// ??? Main Content Component ?????????????????????????????????????????????????
+// ─── Main Content Component ───────────────────────────────────────────────────
 function CustomerMenuContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const tableParam = searchParams.get("table");
   const isOrderingEnabled = Boolean(tableParam && tableParam.trim().length > 0);
   const rawTableNumber = tableParam ? tableParam.replace(/^table\s*/i, "").trim() : "";
@@ -459,6 +474,7 @@ function CustomerMenuContent() {
   const [selectedTableId, setSelectedTableId] = useState<string>("");
   const [isPending, startTransition] = useTransition();
   const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -511,9 +527,12 @@ function CustomerMenuContent() {
       };
       const result = await createOrderAction(payload);
       if (result.success && result.data) {
-        setOrderSuccess(result.data);
+        const placedOrder = result.data;
+        setLastPlacedOrder(placedOrder);
         clearCart();
         setCartOpen(false);
+        // Redirect customer to their personal order status page
+        router.push(`/status?order=${placedOrder.id}&brand=${effectiveBrand}`);
       } else {
         setErrorMessage(result.error || "Failed to place order.");
       }
@@ -525,16 +544,38 @@ function CustomerMenuContent() {
       {/* Minimalist Sticky Header */}
       <header className={cn("sticky top-0 z-50 backdrop-blur-md border-b", theme.headerBg)}>
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between relative">
+          {/* Left spacer – mirrors the right side width to keep title perfectly centred */}
           <div className="w-20" />
+
           <h1 className={cn("absolute left-1/2 -translate-x-1/2 text-lg font-bold tracking-tight whitespace-nowrap", theme.text)}>
             {theme.brandName}
           </h1>
-          <div className="min-w-20 flex items-center justify-end">
+
+          {/* Right side: table badge + icon-only orders button */}
+          <div className="w-20 flex items-center justify-end gap-1.5">
             {rawTableNumber ? (
               <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", theme.tableBadge)}>
                 Table {rawTableNumber}
               </span>
             ) : null}
+
+            {/* Icon-only Check Orders button — notification dot appears when an order exists */}
+            <Link
+              href="/orders"
+              aria-label="Check Orders"
+              className={cn(
+                "relative p-2 rounded-full transition-colors",
+                effectiveBrand === "kyles-eatery"
+                  ? "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+                  : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+              )}
+            >
+              <ReceiptText size={20} strokeWidth={1.8} />
+              {/* Notification dot – only shown when there's a previously placed order */}
+              {lastPlacedOrder && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
+              )}
+            </Link>
           </div>
         </div>
       </header>
@@ -622,7 +663,7 @@ function CustomerMenuContent() {
       {/* Success Modal */}
       <AnimatePresence>
         {orderSuccess && (
-          <SuccessModal order={orderSuccess} theme={theme} rawTableNumber={rawTableNumber} onClose={() => setOrderSuccess(null)} />
+          <SuccessModal order={orderSuccess} theme={theme} brand={effectiveBrand} rawTableNumber={rawTableNumber} onClose={() => setOrderSuccess(null)} />
         )}
       </AnimatePresence>
     </div>
