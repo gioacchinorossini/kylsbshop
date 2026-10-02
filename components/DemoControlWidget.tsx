@@ -58,6 +58,7 @@ export default function DemoControlWidget() {
 
   const isMenu = pathname === "/";
   const isPos  = pathname === "/pos";
+  const isAdmin = pathname.startsWith("/admin");
 
   return (
     <>
@@ -201,6 +202,17 @@ export default function DemoControlWidget() {
                     )}
                   >
                     <LayoutDashboard size={11} />Cashier
+                  </button>
+                  <button
+                    onClick={() => router.push("/admin")}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold border transition",
+                      isAdmin
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-zinc-300"
+                    )}
+                  >
+                    <Settings size={11} />Admin
                   </button>
                 </div>
               </div>

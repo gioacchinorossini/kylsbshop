@@ -10,6 +10,7 @@ export function Navbar() {
     { href: '/', label: '📱 Customer Menu' },
     { href: '/pos', label: '💵 Cashier Terminal', badge: 'Live' },
     { href: '/orders', label: '📋 Orders Tracker', badge: 'Realtime' },
+    { href: '/admin', label: '🛡️ Admin Portal', badge: 'kyleseatery' },
   ];
 
   return (
