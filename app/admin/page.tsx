@@ -815,7 +815,7 @@ function AdminContent() {
           </li>
 
           {/* Live Orders Tracker */}
-          <li onClick={() => router.push('/orders')}>
+          <li onClick={() => router.push('/orders?staff=true')}>
             <i className="ti ti-clipboard-list"></i>
             Orders Tracker
           </li>

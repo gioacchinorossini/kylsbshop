@@ -1,13 +1,26 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { getActiveOrdersAction } from '@/app/actions/orders';
 import { Order, OrderStatus } from '@/types/database';
 import { subscribeToOrdersRealtime } from '@/lib/realtime/orders';
+import { CustomerStatusContent } from '@/app/status/page';
 import Link from 'next/link';
 
-export default function ActiveOrdersPage() {
+function ActiveOrdersContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tableParam = searchParams.get('table');
+
+  useEffect(() => {
+    // If a customer at a table lands on cashier orders page, redirect to customer status
+    if (tableParam) {
+      router.replace(`/status?table=${encodeURIComponent(tableParam)}`);
+    }
+  }, [tableParam, router]);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [connectionStatus, setConnectionStatus] = useState<string>('CONNECTING');
@@ -334,3 +347,29 @@ export default function ActiveOrdersPage() {
   </div>
   );
 }
+
+function OrdersRouteDispatcher() {
+  const searchParams = useSearchParams();
+  const isStaff = searchParams.get('staff') === 'true';
+
+  if (!isStaff) {
+    return <CustomerStatusContent />;
+  }
+
+  return <ActiveOrdersContent />;
+}
+
+export default function ActiveOrdersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <OrdersRouteDispatcher />
+    </Suspense>
+  );
+}
+

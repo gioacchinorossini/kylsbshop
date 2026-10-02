@@ -102,7 +102,76 @@ export async function createOrderAction(
     // ── determine table_id ──
     const tableId = input.table_id && isUUID(input.table_id) ? input.table_id : null;
 
-    // ── insert order row ──
+    // ── Check if table already has an active order to STACK ONTO 1 RECEIPT ──
+    let existingOrderId: string | null = null;
+    let existingOrderRow: any = null;
+
+    if (tableId) {
+      const { data: existingActive } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('table_id', tableId)
+        .in('status', ['pending', 'preparing', 'ready'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (existingActive && existingActive.length > 0) {
+        existingOrderRow = existingActive[0];
+        existingOrderId = existingOrderRow.id;
+      }
+    } else if (input.customer_notes) {
+      const cleanNote = input.customer_notes.trim();
+      const { data: existingActive } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .ilike('customer_notes', cleanNote)
+        .in('status', ['pending', 'preparing', 'ready'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (existingActive && existingActive.length > 0) {
+        existingOrderRow = existingActive[0];
+        existingOrderId = existingOrderRow.id;
+      }
+    }
+
+    // ── IF ACTIVE ORDER EXISTS: STACK NEW ITEMS ONTO THE EXISTING RECEIPT ──
+    if (existingOrderId && existingOrderRow) {
+      const newItemsToInsert = lineItems.map((li) => ({
+        ...li,
+        order_id: existingOrderId,
+      }));
+
+      await supabase.from('order_items').insert(newItemsToInsert);
+
+      const newTotal = +(Number(existingOrderRow.total_amount || 0) + totalAmount).toFixed(2);
+      const { data: updatedOrder } = await supabase
+        .from('orders')
+        .update({
+          total_amount: newTotal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingOrderId)
+        .select('*, dining_tables(*), order_items(*)')
+        .single();
+
+      revalidatePath('/');
+      revalidatePath('/pos');
+      revalidatePath('/orders');
+      revalidatePath('/status');
+
+      if (updatedOrder) {
+        const orderData: Order = {
+          ...updatedOrder,
+          dining_table: Array.isArray(updatedOrder.dining_tables)
+            ? (updatedOrder.dining_tables[0] as DiningTable | null) ?? null
+            : (updatedOrder.dining_tables as DiningTable | null) ?? null,
+        } as Order;
+        return { success: true, data: orderData };
+      }
+    }
+
+    // ── FIRST ORDER FOR TABLE: insert new order row ──
     const { data: orderRow, error: orderErr } = await supabase
       .from('orders')
       .insert({
@@ -158,6 +227,7 @@ export async function createOrderAction(
     revalidatePath('/');
     revalidatePath('/pos');
     revalidatePath('/orders');
+    revalidatePath('/status');
 
     return {
       success: true,
@@ -310,14 +380,109 @@ export async function getOrderByIdAction(
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, dining_tables(*), order_items(*)')
       .eq('id', orderId)
       .single();
 
     if (error || !data) return { success: false, error: 'Order not found.' };
-    return { success: true, data: data as Order };
+
+    const order: Order = {
+      ...data,
+      dining_table: Array.isArray(data.dining_tables)
+        ? (data.dining_tables[0] as DiningTable | null) ?? null
+        : (data.dining_tables as DiningTable | null) ?? null,
+    } as Order;
+
+    return { success: true, data: order };
   } catch {
     return { success: false, error: 'Unexpected server error.' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// getOrdersByTableAction (Customer table view)
+// ═══════════════════════════════════════════════════════════════
+export async function getOrdersByTableAction(
+  tableIdentifier: string
+): Promise<ActionResponse<Order[]>> {
+  try {
+    if (!tableIdentifier) return { success: true, data: [] };
+
+    const supabase = createServerSupabaseClient();
+    const cleanTable = tableIdentifier.replace(/^table\s*/i, '').trim();
+    const isNum = /^\d+$/.test(cleanTable);
+
+    // 1. Resolve table id from dining_tables if available
+    let tableId: string | null = isUUID(cleanTable) ? cleanTable : null;
+
+    if (!tableId) {
+      if (isNum) {
+        const { data: tableRow } = await supabase
+          .from('dining_tables')
+          .select('id')
+          .eq('table_number', parseInt(cleanTable, 10))
+          .maybeSingle();
+        if (tableRow?.id) tableId = tableRow.id;
+      }
+      if (!tableId) {
+        const { data: tableByToken } = await supabase
+          .from('dining_tables')
+          .select('id')
+          .or(`qr_code_token.eq.${cleanTable},id.eq.${cleanTable}`)
+          .maybeSingle();
+        if (tableByToken?.id) tableId = tableByToken.id;
+      }
+    }
+
+    // 2. Query orders for this table (active and recent)
+    let query = supabase
+      .from('orders')
+      .select('*, dining_tables(*), order_items(*)')
+      .order('created_at', { ascending: false })
+      .limit(25);
+
+    if (tableId) {
+      query = query.or(
+        `table_id.eq.${tableId},customer_notes.ilike.%Table ${cleanTable}%,customer_name.ilike.%Table ${cleanTable}%`
+      );
+    } else {
+      query = query.or(
+        `customer_notes.ilike.%Table ${cleanTable}%,customer_name.ilike.%Table ${cleanTable}%`
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn('[getOrdersByTableAction]', error.message);
+      return { success: true, data: [] };
+    }
+
+    const orders: Order[] = (data || []).map((row: any) => ({
+      ...row,
+      dining_table: Array.isArray(row.dining_tables)
+        ? (row.dining_tables[0] as DiningTable | null) ?? null
+        : (row.dining_tables as DiningTable | null) ?? null,
+    })) as Order[];
+
+    // Ensure 1 unified receipt per table by stacking all active order items together
+    const activeOrders = orders.filter((o) => ['pending', 'preparing', 'ready'].includes(o.status));
+    if (activeOrders.length > 0) {
+      const primary = activeOrders[0];
+      // Collect all stacked items
+      const allItems = activeOrders.flatMap((o) => o.order_items || []);
+      const totalAmount = +activeOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0).toFixed(2);
+      const stackedReceipt: Order = {
+        ...primary,
+        total_amount: totalAmount,
+        order_items: allItems,
+      };
+      return { success: true, data: [stackedReceipt] };
+    }
+
+    return { success: true, data: orders.slice(0, 1) };
+  } catch (err) {
+    console.error('[getOrdersByTableAction] unexpected error:', err);
+    return { success: true, data: [] };
   }
 }
 
@@ -329,3 +494,4 @@ export async function cancelOrderAction(
 ): Promise<ActionResponse<Order>> {
   return updateOrderStatusAction(orderId, 'cancelled');
 }
+

@@ -9,7 +9,7 @@ export function Navbar() {
   const navLinks = [
     { href: '/', label: '📱 Customer Menu' },
     { href: '/pos', label: '💵 Cashier Terminal', badge: 'Live' },
-    { href: '/orders', label: '📋 Orders Tracker', badge: 'Realtime' },
+    { href: '/orders?staff=true', label: '📋 Orders Tracker', badge: 'Realtime' },
     { href: '/admin', label: '🛡️ Admin Portal', badge: 'kyleseatery' },
   ];
 

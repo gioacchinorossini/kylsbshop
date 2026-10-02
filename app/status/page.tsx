@@ -1,12 +1,12 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ChefHat, Clock, Utensils, ReceiptText, ArrowLeft } from 'lucide-react';
+import { CheckCircle, ChefHat, Clock, Utensils, ReceiptText, ArrowLeft, RefreshCw, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
-import { getOrderByIdAction } from '@/app/actions/orders';
-import { subscribeToCustomerOrder } from '@/lib/realtime/customer-order';
+import { getOrderByIdAction, getOrdersByTableAction } from '@/app/actions/orders';
+import { subscribeToCustomerOrder, subscribeToTableOrders } from '@/lib/realtime/customer-order';
 import { Order, OrderStatus } from '@/types/database';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ const BRAND_THEME = {
     accentBg: 'bg-orange-500',
     accentLight: 'bg-orange-50',
     accentBorder: 'border-orange-200',
+    tableBadge: 'bg-orange-50 border-orange-200 text-orange-700',
     stepActive: 'bg-orange-500 text-white',
     stepDone: 'bg-orange-100 text-orange-600',
     stepInactive: 'bg-zinc-100 text-zinc-400',
@@ -43,6 +44,7 @@ const BRAND_THEME = {
     accentBg: 'bg-red-600',
     accentLight: 'bg-red-950/60',
     accentBorder: 'border-red-800',
+    tableBadge: 'bg-red-950/80 border-red-800 text-red-300',
     stepActive: 'bg-red-600 text-white',
     stepDone: 'bg-red-950 text-red-400',
     stepInactive: 'bg-zinc-800 text-zinc-500',
@@ -59,24 +61,30 @@ const BRAND_THEME = {
   },
 } as const;
 
-type Theme = typeof BRAND_THEME[Brand];
+type Theme = (typeof BRAND_THEME)[Brand];
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
 type StepId = 'received' | 'preparing' | 'ready';
 const STEPS: { id: StepId; label: string; sub: string; Icon: React.ElementType }[] = [
-  { id: 'received',  label: 'Received',  sub: 'Sent to cashier',  Icon: Clock    },
-  { id: 'preparing', label: 'Preparing', sub: 'Kitchen is on it', Icon: ChefHat  },
-  { id: 'ready',     label: 'Ready',     sub: 'Come pick it up!', Icon: Utensils },
+  { id: 'received', label: 'Received', sub: 'Sent to cashier', Icon: Clock },
+  { id: 'preparing', label: 'Preparing', sub: 'Kitchen is on it', Icon: ChefHat },
+  { id: 'ready', label: 'Ready', sub: 'Come pick it up!', Icon: Utensils },
 ];
 
 function statusToStep(status: OrderStatus): number {
   switch (status) {
-    case 'pending':   return 0;
-    case 'preparing': return 1;
-    case 'ready':     return 2;
-    case 'completed': return 2;
-    case 'cancelled': return -1;
-    default:          return 0;
+    case 'pending':
+      return 0;
+    case 'preparing':
+      return 1;
+    case 'ready':
+      return 2;
+    case 'completed':
+      return 2;
+    case 'cancelled':
+      return -1;
+    default:
+      return 0;
   }
 }
 
@@ -112,10 +120,12 @@ function ProgressStepper({ status, theme }: { status: OrderStatus; theme: Theme 
                   )}
                 </motion.div>
                 <div className="text-center w-20">
-                  <p className={[
-                    'text-[11px] font-bold leading-tight',
-                    isCompleted || isActive ? theme.accent : theme.subtleText,
-                  ].join(' ')}>
+                  <p
+                    className={[
+                      'text-[11px] font-bold leading-tight',
+                      isCompleted || isActive ? theme.accent : theme.subtleText,
+                    ].join(' ')}
+                  >
                     {step.label}
                   </p>
                   <p className={['text-[10px] leading-snug mt-0.5', theme.subtleText].join(' ')}>
@@ -126,10 +136,12 @@ function ProgressStepper({ status, theme }: { status: OrderStatus; theme: Theme 
 
               {/* Connector line */}
               {idx < STEPS.length - 1 && (
-                <div className={[
-                  'flex-1 h-0.5 mt-6 mx-1 rounded-full transition-colors duration-700',
-                  idx < activeIdx ? theme.lineActive : theme.lineInactive,
-                ].join(' ')} />
+                <div
+                  className={[
+                    'flex-1 h-0.5 mt-6 mx-1 rounded-full transition-colors duration-700',
+                    idx < activeIdx ? theme.lineActive : theme.lineInactive,
+                  ].join(' ')}
+                />
               )}
             </div>
           );
@@ -140,11 +152,25 @@ function ProgressStepper({ status, theme }: { status: OrderStatus; theme: Theme 
 }
 
 // ─── Digital receipt ──────────────────────────────────────────────────────────
-function DigitalReceipt({ order, theme }: { order: Order; theme: Theme }) {
+function DigitalReceipt({
+  order,
+  tableNumber,
+  theme,
+}: {
+  order: Order;
+  tableNumber?: string;
+  theme: Theme;
+}) {
   const items = order.order_items ?? [];
   const timeStr = order.created_at
     ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
+
+  const displayTable = order.dining_table
+    ? String(order.dining_table.table_number).padStart(2, '0')
+    : tableNumber
+    ? String(tableNumber).padStart(2, '0')
+    : null;
 
   return (
     <div className="w-full space-y-6">
@@ -205,13 +231,15 @@ function DigitalReceipt({ order, theme }: { order: Order; theme: Theme }) {
       {/* Cashier note */}
       <div className={['rounded-2xl border px-4 py-3.5 text-center', theme.accentLight, theme.accentBorder].join(' ')}>
         <p className={['text-[13px] font-medium leading-snug', theme.text].join(' ')}>
-          {order.dining_table
-            ? (
-              <>State <strong>Table {String(order.dining_table.table_number).padStart(2, '0')}</strong> &amp; Order <strong>#{order.order_number}</strong> at the cashier when paying.</>
-            ) : (
-              <>State Order <strong>#{order.order_number}</strong> at the cashier counter when paying.</>
-            )
-          }
+          {displayTable ? (
+            <>
+              State <strong>Table {displayTable}</strong> &amp; Order <strong>#{order.order_number}</strong> at the cashier when paying.
+            </>
+          ) : (
+            <>
+              State Order <strong>#{order.order_number}</strong> at the cashier counter when paying.
+            </>
+          )}
         </p>
       </div>
     </div>
@@ -219,9 +247,11 @@ function DigitalReceipt({ order, theme }: { order: Order; theme: Theme }) {
 }
 
 // ─── Main page content ────────────────────────────────────────────────────────
-function CustomerStatusContent() {
+export function CustomerStatusContent() {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('order') ?? '';
+  const orderIdParam = searchParams.get('order') ?? '';
+  const tableParam = searchParams.get('table') ?? '';
+  const rawTableNumber = tableParam ? tableParam.replace(/^table\s*/i, '').trim() : '';
   const brandParam = searchParams.get('brand') as Brand | null;
 
   const dayOfWeek = new Date().getDay();
@@ -230,31 +260,163 @@ function CustomerStatusContent() {
     brandParam === 'batchoy-shop' || brandParam === 'kyles-eatery' ? brandParam : systemBrand;
   const theme = BRAND_THEME[brand];
 
-  const [order, setOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [activeOrderId, setActiveOrderId] = useState<string>(orderIdParam);
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadOrder = useCallback(async () => {
-    if (!orderId) { setNotFound(true); setLoading(false); return; }
-    const res = await getOrderByIdAction(orderId);
-    if (res.success && res.data) {
-      setOrder(res.data);
-    } else {
-      setNotFound(true);
+  // Load orders for table or single order
+  const loadOrders = useCallback(async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
+    else setIsRefreshing(true);
+
+    try {
+      if (rawTableNumber) {
+        // Table view: fetch ALL active orders belonging to this table
+        const res = await getOrdersByTableAction(rawTableNumber);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setOrders(res.data);
+          // Set active order if not already selected, or if current selection not found
+          setActiveOrderId((prev) => {
+            if (prev && res.data?.some((o) => o.id === prev)) return prev;
+            if (orderIdParam && res.data?.some((o) => o.id === orderIdParam)) return orderIdParam;
+            // Prefer first active order, else latest order
+            const active = res.data?.find((o) => ['pending', 'preparing', 'ready'].includes(o.status));
+            return active ? active.id : res.data![0].id;
+          });
+        } else if (orderIdParam) {
+          // Fallback to specific orderId if table query returned nothing
+          const singleRes = await getOrderByIdAction(orderIdParam);
+          if (singleRes.success && singleRes.data) {
+            setOrders([singleRes.data]);
+            setActiveOrderId(singleRes.data.id);
+          } else {
+            setOrders([]);
+          }
+        } else {
+          setOrders([]);
+        }
+      } else if (orderIdParam) {
+        // Single order view
+        const res = await getOrderByIdAction(orderIdParam);
+        if (res.success && res.data) {
+          setOrders([res.data]);
+          setActiveOrderId(res.data.id);
+
+          // If the order has a table, load other orders for this table in the background
+          const matchedTable = res.data.dining_table?.table_number
+            ? String(res.data.dining_table.table_number)
+            : res.data.customer_notes?.replace(/^table\s*/i, '').trim();
+          if (matchedTable) {
+            getOrdersByTableAction(matchedTable).then((tableRes) => {
+              if (tableRes.success && Array.isArray(tableRes.data) && tableRes.data.length > 0) {
+                setOrders(tableRes.data);
+              }
+            });
+          }
+        } else {
+          setOrders([]);
+        }
+      } else {
+        // Neither table nor order in URL: check localStorage for current table or last placed order
+        let storedId: string | null = null;
+        let storedTable: string | null = null;
+        if (typeof window !== 'undefined') {
+          storedTable = localStorage.getItem('kyles_current_table');
+          storedId = localStorage.getItem('kyles_last_order_id');
+        }
+
+        if (storedTable) {
+          const res = await getOrdersByTableAction(storedTable);
+          if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+            setOrders(res.data);
+            setActiveOrderId(res.data[0].id);
+            return;
+          }
+        }
+
+        if (storedId) {
+          const res = await getOrderByIdAction(storedId);
+          if (res.success && res.data) {
+            setOrders([res.data]);
+            setActiveOrderId(res.data.id);
+          } else {
+            setOrders([]);
+          }
+        } else {
+          setOrders([]);
+        }
+      }
+    } catch {
+      setOrders([]);
+    } finally {
+      if (!isBackground) setLoading(false);
+      setIsRefreshing(false);
     }
-    setLoading(false);
-  }, [orderId]);
+  }, [rawTableNumber, orderIdParam]);
 
-  useEffect(() => { loadOrder(); }, [loadOrder]);
-
-  // Live status updates scoped to this single order
   useEffect(() => {
-    if (!orderId) return;
-    return subscribeToCustomerOrder(orderId, {
-      onOrderUpdated: (updated) =>
-        setOrder((prev) => prev ? { ...prev, ...updated } : prev),
-    });
-  }, [orderId]);
+    loadOrders(false);
+  }, [loadOrders]);
+
+  // Selected order calculation based on activeOrderId
+  const currentOrder = useMemo(() => {
+    if (!orders || orders.length === 0) return null;
+    return orders.find((o) => o.id === activeOrderId) || orders[0];
+  }, [orders, activeOrderId]);
+
+  // Table ID for realtime
+  const resolvedTableId = useMemo(() => {
+    const fromOrder = orders.find((o) => o.table_id)?.table_id;
+    return fromOrder || (orders[0]?.dining_table?.id ?? null);
+  }, [orders]);
+
+  // Live status updates
+  useEffect(() => {
+    // 1. Subscribe to selected single order updates
+    let unsubscribeOrder: (() => void) | undefined;
+    if (activeOrderId) {
+      unsubscribeOrder = subscribeToCustomerOrder(activeOrderId, {
+        onOrderUpdated: (updated) => {
+          setOrders((prev) =>
+            prev.map((o) => (o.id === activeOrderId ? { ...o, ...updated } : o))
+          );
+        },
+      });
+    }
+
+    // 2. Subscribe to table events if tableId is known
+    let unsubscribeTable: (() => void) | undefined;
+    if (resolvedTableId) {
+      unsubscribeTable = subscribeToTableOrders(resolvedTableId, {
+        onOrderUpdated: (updated) => {
+          setOrders((prev) =>
+            prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o))
+          );
+        },
+        onNewOrder: () => {
+          loadOrders(true);
+        },
+      });
+    }
+
+    return () => {
+      unsubscribeOrder?.();
+      unsubscribeTable?.();
+    };
+  }, [activeOrderId, resolvedTableId, loadOrders]);
+
+  // Back to menu URL preserves table and brand
+  const backToMenuUrl = useMemo(() => {
+    const tableToUse =
+      rawTableNumber ||
+      (currentOrder?.dining_table?.table_number
+        ? String(currentOrder.dining_table.table_number)
+        : '');
+    return tableToUse
+      ? `/?table=${encodeURIComponent(tableToUse)}&brand=${brand}`
+      : `/?brand=${brand}`;
+  }, [rawTableNumber, currentOrder, brand]);
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -269,60 +431,108 @@ function CustomerStatusContent() {
     );
   }
 
-  // ── Not found ─────────────────────────────────────────────────────────────
-  if (notFound || !order) {
+  // ── No Orders Found ───────────────────────────────────────────────────────
+  if (!currentOrder || orders.length === 0) {
     return (
-      <div className={['min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center', theme.bg].join(' ')}>
-        <span className="text-5xl">🧾</span>
-        <p className={['text-lg font-bold', theme.text].join(' ')}>Order not found</p>
-        <p className={['text-sm', theme.subtext].join(' ')}>
-          This link may have expired or the order ID is invalid.
-        </p>
-        <Link
-          href={`/?brand=${brand}`}
-          className={['inline-flex items-center gap-2 mt-2 px-5 py-2.5 rounded-full text-sm font-bold text-white transition', theme.accentBg].join(' ')}
-        >
-          <ArrowLeft size={14} />
-          Back to Menu
-        </Link>
+      <div className={['min-h-screen flex flex-col', theme.bg].join(' ')}>
+        {/* Brand header */}
+        <header className={['sticky top-0 z-40 backdrop-blur-md border-b', theme.headerBg].join(' ')}>
+          <div className="max-w-lg mx-auto px-5 h-14 flex items-center justify-between">
+            <Link
+              href={backToMenuUrl}
+              aria-label="Back to menu"
+              className={['p-2 rounded-full transition-colors -ml-2', theme.backBtn].join(' ')}
+            >
+              <ArrowLeft size={18} />
+            </Link>
+            <h1 className={['text-base font-bold tracking-tight', theme.text].join(' ')}>
+              {theme.brandName}
+            </h1>
+            <div className="w-9" />
+          </div>
+        </header>
+
+        <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center max-w-sm mx-auto">
+          <div className={['w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-sm border', theme.accentLight, theme.accentBorder].join(' ')}>
+            🧾
+          </div>
+          <p className={['text-xl font-extrabold', theme.text].join(' ')}>
+            {rawTableNumber ? `No Active Orders for Table ${rawTableNumber}` : 'No Orders to Track'}
+          </p>
+          <p className={['text-sm leading-relaxed', theme.subtext].join(' ')}>
+            {rawTableNumber
+              ? `You haven't placed an order for Table ${rawTableNumber} yet, or your previous orders are already completed.`
+              : 'Scan your table QR code or order from the menu to track your order in real-time.'}
+          </p>
+          <Link
+            href={backToMenuUrl}
+            className={[
+              'inline-flex items-center gap-2 mt-3 px-6 py-3 rounded-full text-sm font-bold text-white transition shadow-sm active:scale-95',
+              theme.accentBg,
+            ].join(' ')}
+          >
+            <ArrowLeft size={15} />
+            Browse Menu &amp; Order
+          </Link>
+        </main>
       </div>
     );
   }
 
-  const activeStep = statusToStep(order.status);
-  const isDone = order.status === 'completed';
-  const isCancelled = order.status === 'cancelled';
+  const activeStep = statusToStep(currentOrder.status);
+  const isDone = currentOrder.status === 'completed';
+  const isCancelled = currentOrder.status === 'cancelled';
+  const displayTable =
+    currentOrder.dining_table?.table_number ?? (rawTableNumber ? Number(rawTableNumber) : null);
 
   return (
     <div className={['min-h-screen flex flex-col', theme.bg].join(' ')}>
-
-      {/* ── Brand header (no staff Navbar) ──────────────────────────────── */}
-      <header className={[
-        'sticky top-0 z-40 backdrop-blur-md border-b',
-        theme.headerBg,
-      ].join(' ')}>
+      {/* ── Brand header (Customer facing — no staff Navbar) ─────────────── */}
+      <header className={['sticky top-0 z-40 backdrop-blur-md border-b', theme.headerBg].join(' ')}>
         <div className="max-w-lg mx-auto px-5 h-14 flex items-center justify-between">
           <Link
-            href={`/?brand=${brand}`}
+            href={backToMenuUrl}
             aria-label="Back to menu"
             className={['p-2 rounded-full transition-colors -ml-2', theme.backBtn].join(' ')}
           >
             <ArrowLeft size={18} />
           </Link>
-          <h1 className={['text-base font-bold tracking-tight', theme.text].join(' ')}>
-            {theme.brandName}
-          </h1>
-          <div className="w-9" />
+
+          <div className="text-center">
+            <h1 className={['text-base font-bold tracking-tight', theme.text].join(' ')}>
+              {theme.brandName}
+            </h1>
+            <p className={['text-[10px] font-semibold tracking-wide uppercase', theme.subtleText].join(' ')}>
+              Customer Order Tracker
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {displayTable && (
+              <span className={['text-xs font-bold px-2.5 py-1 rounded-full border', theme.tableBadge].join(' ')}>
+                Table {String(displayTable).padStart(2, '0')}
+              </span>
+            )}
+            <button
+              onClick={() => loadOrders(true)}
+              aria-label="Refresh orders"
+              className={['p-1.5 rounded-full transition-colors', theme.backBtn].join(' ')}
+            >
+              <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* ── Main ─────────────────────────────────────────────────────────── */}
-      <main className="flex-1 max-w-lg mx-auto w-full px-5 py-8 flex flex-col gap-9">
+      <main className="flex-1 max-w-lg mx-auto w-full px-5 py-6 flex flex-col gap-7">
+
+
 
         {/* Status headline */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={order.status}
+            key={currentOrder.id + currentOrder.status}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -347,14 +557,19 @@ function CustomerStatusContent() {
                   {activeStep === 1 && 'Kitchen is Preparing…'}
                   {activeStep === 2 && 'Ready for Pickup! 🍽️'}
                 </p>
+                {activeStep === 0 && (
+                  <p className={['text-sm', theme.subtext].join(' ')}>
+                    Please proceed to the cashier counter to confirm payment.
+                  </p>
+                )}
                 {activeStep === 1 && (
                   <p className={['text-sm', theme.subtext].join(' ')}>
-                    Your food is being freshly prepared.
+                    Your food is being freshly prepared in the kitchen.
                   </p>
                 )}
                 {activeStep === 2 && (
                   <p className={['text-sm', theme.subtext].join(' ')}>
-                    Please proceed to the counter.
+                    Your order is ready! Please collect it at the counter.
                   </p>
                 )}
               </>
@@ -363,23 +578,41 @@ function CustomerStatusContent() {
         </AnimatePresence>
 
         {/* Progress bar */}
-        {!isCancelled && <ProgressStepper status={order.status} theme={theme} />}
+        {!isCancelled && <ProgressStepper status={currentOrder.status} theme={theme} />}
 
         {/* Divider */}
         <div className={['w-full h-px', theme.dividerBg].join(' ')} />
 
         {/* Digital receipt */}
-        <DigitalReceipt order={order} theme={theme} />
+        <DigitalReceipt
+          order={currentOrder}
+          tableNumber={rawTableNumber || undefined}
+          theme={theme}
+        />
 
-        {/* Back link */}
-        <div className="pb-8 text-center">
+        {/* Actions / Order More */}
+        <div className="space-y-3 pt-2 pb-8 text-center">
           <Link
-            href={`/?brand=${brand}`}
-            className={['inline-flex items-center gap-1.5 text-xs font-semibold transition hover:underline', theme.footerLink].join(' ')}
+            href={backToMenuUrl}
+            className={[
+              'w-full py-3.5 rounded-2xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm',
+              theme.accentBg,
+              'text-white active:scale-98',
+            ].join(' ')}
           >
-            <ArrowLeft size={12} />
-            Back to {theme.brandName} Menu
+            <ShoppingBag size={16} />
+            Order More Food
           </Link>
+
+          <div>
+            <Link
+              href={backToMenuUrl}
+              className={['inline-flex items-center gap-1.5 text-xs font-semibold transition hover:underline', theme.footerLink].join(' ')}
+            >
+              <ArrowLeft size={12} />
+              Back to {theme.brandName} Menu
+            </Link>
+          </div>
         </div>
       </main>
     </div>

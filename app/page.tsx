@@ -12,7 +12,7 @@ import {
 import { Category, MenuItem, Order } from "@/types/database";
 import { getCategoriesAction, getMenuItemsAction } from "@/app/actions/menu";
 import { getTablesAction } from "@/app/actions/tables";
-import { createOrderAction } from "@/app/actions/orders";
+import { createOrderAction, getOrdersByTableAction } from "@/app/actions/orders";
 import { useCartStore, Brand } from "@/lib/store/cart";
 
 // ??? Utility ??????????????????????????????????????????????????????????????
@@ -403,7 +403,7 @@ function SuccessModal({
           {/* CTA Buttons */}
           <div className="space-y-2.5 pt-1">
             <Link
-              href={`/status?order=${order.id}&brand=${brand}`}
+              href={`/status?order=${order.id}&brand=${brand}${rawTableNumber ? `&table=${encodeURIComponent(rawTableNumber)}` : ""}`}
               className={cn(
                 "w-full py-3.5 rounded-2xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm",
                 theme.submitBtn
@@ -475,6 +475,7 @@ function CustomerMenuContent() {
   const [isPending, startTransition] = useTransition();
   const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
+  const [hasActiveOrder, setHasActiveOrder] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -501,6 +502,44 @@ function CustomerMenuContent() {
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawTableNumber, tableParam, effectiveBrand]);
+
+  // Save table number to localStorage whenever detected
+  useEffect(() => {
+    if (rawTableNumber && typeof window !== "undefined") {
+      try {
+        localStorage.setItem("kyles_current_table", rawTableNumber);
+      } catch {}
+    }
+  }, [rawTableNumber]);
+
+  // Check if this table or session has active orders to show notification indicator
+  useEffect(() => {
+    async function checkTableOrders() {
+      const tableToCheck =
+        rawTableNumber ||
+        (typeof window !== "undefined" ? localStorage.getItem("kyles_current_table") || "" : "");
+
+      if (tableToCheck) {
+        const res = await getOrdersByTableAction(tableToCheck);
+        if (res.success && res.data && res.data.length > 0) {
+          const active = res.data.some((o) =>
+            ["pending", "preparing", "ready"].includes(o.status)
+          );
+          if (active) setHasActiveOrder(true);
+          setLastPlacedOrder(res.data[0]);
+          return;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const storedId = localStorage.getItem("kyles_last_order_id");
+        if (storedId) {
+          setHasActiveOrder(true);
+        }
+      }
+    }
+    checkTableOrders();
+  }, [rawTableNumber]);
 
   const kylesCatId = categories.find((c) => c.slug === "kyles-eatery")?.id || "cat-kyles";
   const batchoyCatId = categories.find((c) => c.slug === "batchoy-shop")?.id || "cat-batchoy";
@@ -529,10 +568,21 @@ function CustomerMenuContent() {
       if (result.success && result.data) {
         const placedOrder = result.data;
         setLastPlacedOrder(placedOrder);
+        setHasActiveOrder(true);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("kyles_last_order_id", placedOrder.id);
+            if (rawTableNumber) {
+              localStorage.setItem(`kyles_table_${rawTableNumber}_last_order`, placedOrder.id);
+            }
+          } catch {}
+        }
         clearCart();
         setCartOpen(false);
         // Redirect customer to their personal order status page
-        router.push(`/status?order=${placedOrder.id}&brand=${effectiveBrand}`);
+        router.push(
+          `/status?order=${placedOrder.id}&brand=${effectiveBrand}${rawTableNumber ? `&table=${encodeURIComponent(rawTableNumber)}` : ""}`
+        );
       } else {
         setErrorMessage(result.error || "Failed to place order.");
       }
@@ -559,9 +609,31 @@ function CustomerMenuContent() {
               </span>
             ) : null}
 
-            {/* Icon-only Check Orders button — notification dot appears when an order exists */}
+            {/* Icon-only Check Orders button — links to /status passing table ID */}
             <Link
-              href="/orders"
+              href={
+                rawTableNumber
+                  ? `/status?table=${encodeURIComponent(rawTableNumber)}`
+                  : lastPlacedOrder
+                  ? `/status?order=${lastPlacedOrder.id}`
+                  : `/status`
+              }
+              onClick={(e) => {
+                if (!rawTableNumber && typeof window !== "undefined") {
+                  const storedTable = localStorage.getItem("kyles_current_table");
+                  if (storedTable) {
+                    e.preventDefault();
+                    router.push(`/status?table=${encodeURIComponent(storedTable)}&brand=${effectiveBrand}`);
+                    return;
+                  }
+                  const storedOrder = localStorage.getItem("kyles_last_order_id");
+                  if (storedOrder) {
+                    e.preventDefault();
+                    router.push(`/status?order=${encodeURIComponent(storedOrder)}&brand=${effectiveBrand}`);
+                    return;
+                  }
+                }
+              }}
               aria-label="Check Orders"
               className={cn(
                 "relative p-2 rounded-full transition-colors",
@@ -571,8 +643,8 @@ function CustomerMenuContent() {
               )}
             >
               <ReceiptText size={20} strokeWidth={1.8} />
-              {/* Notification dot – only shown when there's a previously placed order */}
-              {lastPlacedOrder && (
+              {/* Notification dot – shown when there's an active or previously placed order */}
+              {(hasActiveOrder || lastPlacedOrder) && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
               )}
             </Link>
