@@ -8,7 +8,7 @@ import { twMerge } from "tailwind-merge";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ShoppingCart, Plus, Minus, X, Flame, Leaf, ChevronDown, CheckCircle, ReceiptText, Receipt, Armchair,
+  ShoppingCart, Plus, Minus, X, Flame, Leaf, ChevronDown, CheckCircle, ReceiptText, Receipt, Armchair, Utensils, ShoppingBag,
 } from "lucide-react";
 import { Category, MenuItem, Order } from "@/types/database";
 import { getCategoriesAction, getMenuItemsAction } from "@/app/actions/menu";
@@ -173,8 +173,9 @@ function CartDrawer({
   onSubmit, isPending, errorMessage, onClose,
 }: {
   theme: Theme; rawTableNumber: string;
-  onSubmit: () => void; isPending: boolean; errorMessage: string | null; onClose: () => void;
+  onSubmit: (orderType: 'dine-in' | 'take-out') => void; isPending: boolean; errorMessage: string | null; onClose: () => void;
 }) {
+  const [orderType, setOrderType] = useState<'dine-in' | 'take-out'>('dine-in');
   const { items, updateQuantity, updateInstructions, totalCount, subtotal } = useCartStore();
 
   return (
@@ -267,13 +268,44 @@ function CartDrawer({
                 {errorMessage}
               </p>
             )}
+
+            {/* iOS-Style Segmented Control: Dine-In vs. Take-Out */}
+            <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-6">
+              <button
+                type="button"
+                onClick={() => setOrderType('dine-in')}
+                className={cn(
+                  "flex-1 flex items-center justify-center py-2 px-3 text-xs font-semibold rounded-md transition-all duration-150",
+                  orderType === 'dine-in'
+                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                )}
+              >
+                <Utensils className="w-4 h-4 mr-2" />
+                <span>Dine-In</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderType('take-out')}
+                className={cn(
+                  "flex-1 flex items-center justify-center py-2 px-3 text-xs font-semibold rounded-md transition-all duration-150",
+                  orderType === 'take-out'
+                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                )}
+              >
+                <ShoppingBag className="w-4 h-4 mr-2" />
+                <span>Take-Out</span>
+              </button>
+            </div>
+
             <div className={cn("flex justify-between items-baseline mb-4", theme.text)}>
               <span className="text-sm font-medium">Total</span>
               <span className={cn("text-2xl font-bold font-mono tracking-tight", theme.price)}>
                 ₱{subtotal().toFixed(2)}
               </span>
             </div>
-            <motion.button whileTap={{ scale: 0.97 }} onClick={onSubmit} disabled={isPending}
+            <motion.button whileTap={{ scale: 0.97 }} onClick={() => onSubmit(orderType)} disabled={isPending}
               className={cn("w-full py-3.5 rounded-2xl text-sm font-bold transition disabled:opacity-50", theme.submitBtn)}>
               {isPending ? "Sending to Cashier..." : "Place Order →"}
             </motion.button>
@@ -570,14 +602,15 @@ function CustomerMenuContent() {
       : i.category_id === batchoyCatId || i.category_id === "cat-batchoy"
   );
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = (orderType: 'dine-in' | 'take-out' = 'dine-in') => {
     if (!isOrderingEnabled || cartItems.length === 0) return;
     setErrorMessage(null);
     startTransition(async () => {
       const payload = {
         table_id: selectedTableId || undefined,
+        order_type: orderType,
         customer_name: rawTableNumber ? "Table " + rawTableNumber + " Guest" : "Kiosk Guest",
-        customer_notes: rawTableNumber ? "Table " + rawTableNumber : "",
+        customer_notes: rawTableNumber ? `Table ${rawTableNumber} [${effectiveBrand}]` : `[${effectiveBrand}]`,
         items: cartItems.map((c) => ({
           menu_item_id: c.menuItem.id,
           quantity: c.quantity,
@@ -592,15 +625,17 @@ function CustomerMenuContent() {
         if (typeof window !== "undefined") {
           try {
             localStorage.setItem("kyles_last_order_id", placedOrder.id);
+            localStorage.setItem("kyles_current_brand", effectiveBrand);
             if (rawTableNumber) {
+              localStorage.setItem("kyles_current_table", rawTableNumber);
               localStorage.setItem(`kyles_table_${rawTableNumber}_last_order`, placedOrder.id);
             }
-            const rawMyOrders = localStorage.getItem("@kyle_pos_my_orders");
-            const parsedMyOrders = rawMyOrders ? JSON.parse(rawMyOrders) : [];
-            const updatedMyOrders = Array.isArray(parsedMyOrders)
-              ? [...parsedMyOrders, placedOrder.id]
-              : [placedOrder.id];
-            localStorage.setItem("@kyle_pos_my_orders", JSON.stringify(updatedMyOrders));
+            const existing = JSON.parse(localStorage.getItem('@kyle_pos_my_orders') || '[]');
+            const updated = Array.isArray(existing) ? existing : [];
+            if (!updated.includes(placedOrder.id)) {
+              updated.push(placedOrder.id);
+            }
+            localStorage.setItem('@kyle_pos_my_orders', JSON.stringify(updated));
             setHasActiveOrders(true);
           } catch {}
         }
@@ -655,16 +690,19 @@ function CustomerMenuContent() {
               </span>
             ) : null}
 
-            {/* Icon-only Check Orders button — links to /status passing table ID */}
+            {/* Icon-only Check Orders button — links to /status passing table ID and brand */}
             <Link
               href={
                 rawTableNumber
-                  ? `/status?table=${encodeURIComponent(rawTableNumber)}`
+                  ? `/status?table=${encodeURIComponent(rawTableNumber)}&brand=${effectiveBrand}`
                   : lastPlacedOrder
-                  ? `/status?order=${lastPlacedOrder.id}`
-                  : `/status`
+                  ? `/status?order=${lastPlacedOrder.id}&brand=${effectiveBrand}`
+                  : `/status?brand=${effectiveBrand}`
               }
               onClick={(e) => {
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("kyles_current_brand", effectiveBrand);
+                }
                 if (!rawTableNumber && typeof window !== "undefined") {
                   const storedTable = localStorage.getItem("kyles_current_table");
                   if (storedTable) {
@@ -678,6 +716,9 @@ function CustomerMenuContent() {
                     router.push(`/status?order=${encodeURIComponent(storedOrder)}&brand=${effectiveBrand}`);
                     return;
                   }
+                  e.preventDefault();
+                  router.push(`/status?brand=${effectiveBrand}`);
+                  return;
                 }
               }}
               aria-label="Check Orders"

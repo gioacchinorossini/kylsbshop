@@ -106,11 +106,14 @@ export async function createOrderAction(
     let existingOrderId: string | null = null;
     let existingOrderRow: any = null;
 
+    const requestedOrderType = input.order_type || 'dine-in';
+
     if (tableId) {
       const { data: existingActive } = await supabase
         .from('orders')
         .select('*, order_items(*)')
         .eq('table_id', tableId)
+        .eq('order_type', requestedOrderType)
         .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at', { ascending: false })
         .limit(1);
@@ -125,6 +128,7 @@ export async function createOrderAction(
         .from('orders')
         .select('*, order_items(*)')
         .ilike('customer_notes', cleanNote)
+        .eq('order_type', requestedOrderType)
         .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at', { ascending: false })
         .limit(1);
@@ -172,12 +176,12 @@ export async function createOrderAction(
     }
 
     // ── FIRST ORDER FOR TABLE: insert new order row ──
-    const { data: orderRow, error: orderErr } = await supabase
+    let { data: orderRow, error: orderErr } = await supabase
       .from('orders')
       .insert({
         order_number: orderNumber,
         table_id: tableId,
-        order_type: input.order_type || 'dine_in',
+        order_type: requestedOrderType,
         status: 'pending' as OrderStatus,
         total_amount: totalAmount,
         customer_name: input.customer_name || 'Guest',
@@ -185,6 +189,28 @@ export async function createOrderAction(
       })
       .select('*')
       .single();
+
+    // If database has older enum order_type_enum without hyphens, fallback to enum values
+    if (orderErr && (orderErr.message?.includes('order_type') || orderErr.code === '22P02')) {
+      const fallbackOrderType = (requestedOrderType === 'take-out' || requestedOrderType === 'takeaway') ? 'takeaway' : 'dine_in';
+      const retry = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          table_id: tableId,
+          order_type: fallbackOrderType,
+          status: 'pending' as OrderStatus,
+          total_amount: totalAmount,
+          customer_name: input.customer_name || 'Guest',
+          customer_notes: input.customer_notes || null,
+        })
+        .select('*')
+        .single();
+      if (retry.data) {
+        orderRow = retry.data;
+        orderErr = null;
+      }
+    }
 
     if (orderErr || !orderRow) {
       console.warn('[createOrderAction] insert order failed:', orderErr?.message);
@@ -196,7 +222,7 @@ export async function createOrderAction(
           id: `local-${Date.now()}`,
           order_number: orderNumber,
           table_id: tableId,
-          order_type: input.order_type || 'dine_in',
+          order_type: requestedOrderType,
           status: 'pending',
           total_amount: totalAmount,
           customer_name: input.customer_name || 'Guest',
@@ -400,10 +426,43 @@ export async function getOrderByIdAction(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Helper: detect brand from order customer notes or item names
+// ═══════════════════════════════════════════════════════════════
+function detectOrderBrand(order: any): 'batchoy-shop' | 'kyles-eatery' {
+  const notes = (order.customer_notes || '').toLowerCase();
+  if (notes.includes('batchoy-shop') || notes.includes('batchoy')) return 'batchoy-shop';
+  if (notes.includes('kyles-eatery') || notes.includes('kyles') || notes.includes('kyle')) return 'kyles-eatery';
+
+  const items = order.order_items || [];
+  for (const item of items) {
+    const name = (item.menu_item_name || '').toLowerCase();
+    if (
+      name.includes('batchoy') ||
+      name.includes('tempura') ||
+      name.includes('miki') ||
+      name.includes('caesar')
+    ) {
+      return 'batchoy-shop';
+    }
+    if (
+      name.includes('chori') ||
+      name.includes('inasal') ||
+      name.includes('bbq') ||
+      name.includes('ala king') ||
+      name.includes('kawali')
+    ) {
+      return 'kyles-eatery';
+    }
+  }
+  return 'kyles-eatery';
+}
+
+// ═══════════════════════════════════════════════════════════════
 // getOrdersByTableAction (Customer table view)
 // ═══════════════════════════════════════════════════════════════
 export async function getOrdersByTableAction(
-  tableIdentifier: string
+  tableIdentifier: string,
+  brandFilter?: string
 ): Promise<ActionResponse<Order[]>> {
   try {
     if (!tableIdentifier) return { success: true, data: [] };
@@ -465,26 +524,31 @@ export async function getOrdersByTableAction(
     })) as Order[];
 
     // Exclude archived orders so new customer doesn't see old customer's orders
-    const nonArchivedOrders = orders.filter((o) => o.status !== 'Archived' && o.status !== 'archived');
+    let nonArchivedOrders = orders.filter((o) => o.status !== 'Archived' && o.status !== 'archived');
 
-    // Ensure 1 unified receipt per table by stacking all active order items together
-    const activeOrders = nonArchivedOrders.filter((o) => ['pending', 'preparing', 'ready'].includes(o.status));
+    // Filter by brand if specified
+    if (brandFilter === 'batchoy-shop' || brandFilter === 'kyles-eatery') {
+      nonArchivedOrders = nonArchivedOrders.filter((o) => detectOrderBrand(o) === brandFilter);
+    }
+
+    // Return all active orders chronologically (oldest to newest) for multiple order tracking
+    const activeStatuses = ['pending', 'received', 'preparing', 'ready'];
+    const activeOrders = nonArchivedOrders.filter((o) =>
+      activeStatuses.includes((o.status || '').toLowerCase())
+    );
     if (activeOrders.length > 0) {
-      const primary = activeOrders[0];
-      // Collect all stacked items
-      const allItems = activeOrders.flatMap((o) => o.order_items || []);
-      const totalAmount = +activeOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0).toFixed(2);
-      const stackedReceipt: Order = {
-        ...primary,
-        total_amount: totalAmount,
-        order_items: allItems,
-      };
-      return { success: true, data: [stackedReceipt] };
+      const sorted = [...activeOrders].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      return { success: true, data: sorted };
     }
 
     // If there are non-archived orders (e.g. recently completed and not yet archived by cashier)
     if (nonArchivedOrders.length > 0) {
-      return { success: true, data: nonArchivedOrders.slice(0, 1) };
+      const sorted = [...nonArchivedOrders].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      return { success: true, data: sorted };
     }
 
     // All orders for this table are archived -> clear table for new customer
