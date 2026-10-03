@@ -1,2605 +1,1740 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import {
+  Flame,
+  LayoutGrid,
+  Receipt,
+  Rows3,
+  UtensilsCrossed,
+  Users,
+  Settings,
+  CircleHelp,
+  LogOut,
+  Search,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Minus,
+  Pencil,
+  Trash2,
+  Printer,
+  CreditCard,
+  Banknote,
+  QrCode,
+  SlidersHorizontal,
+  User,
+  MoreVertical,
+  X,
+  Timer,
+} from 'lucide-react';
 import './admin.css';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-export interface AdminProduct {
-  P_code: number;
-  Product_code: string;
-  P_name: string;
-  P_Category: string;
-  P_S_P: number;
-  P_P_P: number;
-  P_image: string | null;
-  Date_time: string;
-  is_available?: boolean;
+// ─── Data Types ─────────────────────────────────────────────────────────────
+interface Dish {
+  id: string;
+  name: string;
+  category: string;
+  tag: string;
+  price: number;
+  imageUrl: string;
+  isSpecial?: boolean;
 }
 
-export interface SalesRecord {
-  Order_No: string;
-  Date_Time: string;
-  Total_Qty: number;
-  Total_Amount: number;
-  Order_Type: 'Dine-In' | 'Takeout' | 'Delivery';
-  Payment_Method: 'Cash' | 'GCash / QR' | 'Card';
-  Customer_Name: string;
-  Status: 'Completed' | 'Preparing' | 'Ready' | 'Cancelled';
-  Items: {
-    P_Code: string;
-    Product_Name: string;
-    Quantity: number;
-    Price: number;
-    SubTotal: number;
+interface OrderLineCard {
+  id: string;
+  orderNumber: string;
+  tableNumber: string;
+  itemCount: number;
+  timeAgo: string;
+  status: 'In Kitchen' | 'Wait List' | 'Ready' | 'Served';
+  colorTheme: 'mint' | 'peach' | 'purple' | 'blue';
+  orderType: 'Dine in' | 'Wait List' | 'Take Away' | 'Served';
+  guestCount: number;
+  items: {
+    dishId: string;
+    name: string;
+    quantity: number;
+    price: number;
   }[];
 }
 
-export interface StockLog {
-  Sin_ID: number;
-  Date_time: string;
-  Product_code: string;
-  P_name: string;
-  Quantity: number;
-  Cost_Price: number;
-  Supplier: string;
+interface TableReservation {
+  id: string;
+  time: string;
+  name: string;
+  table: string;
+  guests: number;
+  phone?: string;
+  tag: string;
+  status: 'Payment' | 'On Dine' | 'Free' | 'Unpaid' | 'Paid';
+  type: 'All' | 'Reservation' | 'On Dine';
 }
 
-export interface StaffAccount {
-  ACC_ID: number;
-  Acc_Name: string;
-  User_ID: string;
-  Role: 'Admin' | 'Manager' | 'Cashier';
-  Date_Time: string;
+interface FloorTable {
+  id: string;
+  name: string;
+  zone: 'Main Dining' | 'Terrace' | 'Outdoor';
+  capacity: number;
+  status: 'available' | 'reserved' | 'ondine';
 }
 
-// ─── Default Sample Data for kyleseatery ─────────────────────────────────────
-const INITIAL_PRODUCTS: AdminProduct[] = [
+// ─── Dishes Database matching Tasty Station UI ─────────────────────────────
+const INITIAL_DISHES: Dish[] = [
   {
-    P_code: 1,
-    Product_code: 'KY-01',
-    P_name: 'Chori Sandwich',
-    P_Category: 'sandwiches',
-    P_S_P: 199,
-    P_P_P: 110,
-    P_image: null,
-    Date_time: '2026-10-01 10:30:00',
-    is_available: true,
+    id: 'd-1',
+    name: 'Grilled Salmon Steak',
+    category: 'special',
+    tag: 'Lunch',
+    price: 15.0,
+    imageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 2,
-    Product_code: 'KY-02',
-    P_name: 'Backribs',
-    P_Category: 'sizzling',
-    P_S_P: 160,
-    P_P_P: 95,
-    P_image: null,
-    Date_time: '2026-10-01 10:32:00',
-    is_available: true,
+    id: 'd-2',
+    name: 'Tofu Poke Bowl',
+    category: 'soups',
+    tag: 'Salad',
+    price: 7.0,
+    imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 3,
-    Product_code: 'KY-03',
-    P_name: 'Hungarian Sausage with Rice & Egg',
-    P_Category: 'sizzling',
-    P_S_P: 120,
-    P_P_P: 70,
-    P_image: null,
-    Date_time: '2026-10-01 10:35:00',
-    is_available: true,
+    id: 'd-3',
+    name: 'Pasta with Roast Beef',
+    category: 'special',
+    tag: 'Pasta',
+    price: 10.0,
+    imageUrl: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 4,
-    Product_code: 'KY-04',
-    P_name: 'Crispy Sizzling Pork Sisig Solo',
-    P_Category: 'sizzling',
-    P_S_P: 160,
-    P_P_P: 85,
-    P_image: 'uploads/SIG01_Sisig_Pork_Solo.jpg',
-    Date_time: '2026-10-01 11:00:00',
-    is_available: true,
+    id: 'd-4',
+    name: 'Beef Steak',
+    category: 'special',
+    tag: 'Beef',
+    price: 30.0,
+    imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 5,
-    Product_code: 'KY-05',
-    P_name: 'Special Palabok',
-    P_Category: 'appetizers',
-    P_S_P: 50,
-    P_P_P: 28,
-    P_image: null,
-    Date_time: '2026-10-01 11:05:00',
-    is_available: true,
+    id: 'd-5',
+    name: 'Shrimp Rice Bowl',
+    category: 'chickens',
+    tag: 'Rice',
+    price: 6.0,
+    imageUrl: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 6,
-    Product_code: 'KY-06',
-    P_name: 'Caramelized Pork Tocino with Rice',
-    P_Category: 'sizzling',
-    P_S_P: 85,
-    P_P_P: 45,
-    P_image: null,
-    Date_time: '2026-10-01 11:10:00',
-    is_available: true,
+    id: 'd-6',
+    name: 'Apple Stuffed Pancake',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 35.0,
+    imageUrl: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 7,
-    Product_code: 'KY-07',
-    P_name: 'Creamy Chicken Ala King',
-    P_Category: 'sizzling',
-    P_S_P: 99,
-    P_P_P: 55,
-    P_image: null,
-    Date_time: '2026-10-01 11:15:00',
-    is_available: true,
+    id: 'd-7',
+    name: 'Chicken Quinoa & Herbs',
+    category: 'chickens',
+    tag: 'Chicken',
+    price: 12.0,
+    imageUrl: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 8,
-    Product_code: 'KY-08',
-    P_name: 'Crispy Fried Chicken Inasal with Rice',
-    P_Category: 'inasal',
-    P_S_P: 85,
-    P_P_P: 48,
-    P_image: 'uploads/KM02_PAA_With_Rice.jpg',
-    Date_time: '2026-10-01 11:20:00',
-    is_available: true,
+    id: 'd-8',
+    name: 'Vegetable Shrimp',
+    category: 'soups',
+    tag: 'Salad',
+    price: 10.0,
+    imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=300&q=80',
+    isSpecial: true,
   },
   {
-    P_code: 9,
-    Product_code: 'BS-01',
-    P_name: 'Batchoy Special (Sunday Schedule)',
-    P_Category: 'batchoy',
-    P_S_P: 150,
-    P_P_P: 80,
-    P_image: null,
-    Date_time: '2026-10-01 11:25:00',
-    is_available: true,
+    id: 'd-9',
+    name: 'Cheese Syrniki Pancakes',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 8.0,
+    imageUrl: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=300&q=80',
   },
   {
-    P_code: 10,
-    Product_code: 'BS-02',
-    P_name: 'Ordinary Batchoy (Sunday Schedule)',
-    P_Category: 'batchoy',
-    P_S_P: 100,
-    P_P_P: 50,
-    P_image: null,
-    Date_time: '2026-10-01 11:30:00',
-    is_available: true,
+    id: 'd-10',
+    name: 'Apple Stuffed Pancake',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 10.0,
+    imageUrl: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=300&q=80',
   },
   {
-    P_code: 11,
-    Product_code: 'BS-03',
-    P_name: 'Crispy Golden Chicken Tempura',
-    P_Category: 'appetizers',
-    P_S_P: 120,
-    P_P_P: 65,
-    P_image: null,
-    Date_time: '2026-10-01 11:35:00',
-    is_available: true,
+    id: 'd-11',
+    name: 'Terracotta Bowl',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 12.0,
+    imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80',
   },
   {
-    P_code: 12,
-    Product_code: 'KY-09',
-    P_name: 'Fragrant Garlic & Egg Fried Rice',
-    P_Category: 'rice',
-    P_S_P: 45,
-    P_P_P: 20,
-    P_image: 'uploads/OD01_Rice.jpg',
-    Date_time: '2026-10-01 11:40:00',
-    is_available: true,
+    id: 'd-12',
+    name: 'Granola Banana & Berry',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 10.0,
+    imageUrl: 'https://images.unsplash.com/photo-1511690656952-34342bb7c2f2?auto=format&fit=crop&w=300&q=80',
   },
   {
-    P_code: 13,
-    Product_code: 'DK-01',
-    P_name: 'Coca-Cola Regular 8oz Bottle',
-    P_Category: 'drinks',
-    P_S_P: 35,
-    P_P_P: 18,
-    P_image: 'uploads/DK01_Coke_8oz.jpg',
-    Date_time: '2026-10-01 11:45:00',
-    is_available: true,
+    id: 'd-13',
+    name: 'Vanilla Cherry Cupcake',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 8.0,
+    imageUrl: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=300&q=80',
   },
   {
-    P_code: 14,
-    Product_code: 'SIG-02',
-    P_name: 'Sizzling Sisig Pork Meal with Rice & Egg',
-    P_Category: 'sizzling',
-    P_S_P: 185,
-    P_P_P: 95,
-    P_image: 'uploads/SIG02_Sisig_Pork_Meal.jpg',
-    Date_time: '2026-10-01 11:50:00',
-    is_available: true,
+    id: 'd-14',
+    name: 'Belgian Waffles with Syrup',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 20.0,
+    imageUrl: 'https://images.unsplash.com/photo-1562376552-0d160a2f238d?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 'd-15',
+    name: 'Muesli Bowl with Honey',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 10.0,
+    imageUrl: 'https://images.unsplash.com/photo-1546069901-d8a43657cb02?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 'd-16',
+    name: 'Waffles with Ice-cream',
+    category: 'desserts',
+    tag: 'Dessert',
+    price: 10.0,
+    imageUrl: 'https://images.unsplash.com/photo-1568051243851-f9b136146e97?auto=format&fit=crop&w=300&q=80',
   },
 ];
 
-const INITIAL_SALES: SalesRecord[] = [
+// ─── Order Line Cards matching screenshot ──────────────────────────────────
+const INITIAL_ORDER_CARDS: OrderLineCard[] = [
   {
-    Order_No: 'ORD-1092',
-    Date_Time: '2026-10-02 12:45:10',
-    Total_Qty: 3,
-    Total_Amount: 445,
-    Order_Type: 'Dine-In',
-    Payment_Method: 'Cash',
-    Customer_Name: 'Table 03 - Marcus',
-    Status: 'Completed',
-    Items: [
-      { P_Code: 'KY-04', Product_Name: 'Crispy Sizzling Pork Sisig Solo', Quantity: 1, Price: 160, SubTotal: 160 },
-      { P_Code: 'KY-01', Product_Name: 'Chori Sandwich', Quantity: 1, Price: 199, SubTotal: 199 },
-      { P_Code: 'KY-09', Product_Name: 'Fragrant Garlic & Egg Fried Rice', Quantity: 1, Price: 45, SubTotal: 45 },
-      { P_Code: 'DK-01', Product_Name: 'Coca-Cola Regular 8oz Bottle', Quantity: 1, Price: 35, SubTotal: 35 },
+    id: 'ord-27',
+    orderNumber: '#F0027',
+    tableNumber: 'Table 03',
+    itemCount: 8,
+    timeAgo: '2 mins ago',
+    status: 'In Kitchen',
+    colorTheme: 'mint',
+    orderType: 'Dine in',
+    guestCount: 3,
+    items: [
+      { dishId: 'd-1', name: 'Grilled Salmon Steak', quantity: 2, price: 15.0 },
+      { dishId: 'd-3', name: 'Pasta with Roast Beef', quantity: 3, price: 10.0 },
+      { dishId: 'd-5', name: 'Shrimp Rice Bowl', quantity: 2, price: 6.0 },
+      { dishId: 'd-8', name: 'Vegetable Shrimp', quantity: 1, price: 10.0 },
     ],
   },
   {
-    Order_No: 'ORD-1091',
-    Date_Time: '2026-10-02 12:30:22',
-    Total_Qty: 2,
-    Total_Amount: 310,
-    Order_Type: 'Takeout',
-    Payment_Method: 'GCash / QR',
-    Customer_Name: 'Elena Ramos',
-    Status: 'Completed',
-    Items: [
-      { P_Code: 'KY-02', Product_Name: 'Backribs', Quantity: 1, Price: 160, SubTotal: 160 },
-      { P_Code: 'BS-01', Product_Name: 'Batchoy Special', Quantity: 1, Price: 150, SubTotal: 150 },
+    id: 'ord-28',
+    orderNumber: '#F0028',
+    tableNumber: 'Table 07',
+    itemCount: 3,
+    timeAgo: 'Just Now',
+    status: 'Wait List',
+    colorTheme: 'peach',
+    orderType: 'Wait List',
+    guestCount: 2,
+    items: [
+      { dishId: 'd-4', name: 'Beef Steak', quantity: 1, price: 30.0 },
+      { dishId: 'd-7', name: 'Chicken Quinoa & Herbs', quantity: 2, price: 12.0 },
     ],
   },
   {
-    Order_No: 'ORD-1090',
-    Date_Time: '2026-10-02 12:15:05',
-    Total_Qty: 4,
-    Total_Amount: 439,
-    Order_Type: 'Dine-In',
-    Payment_Method: 'Cash',
-    Customer_Name: 'Table 01 - David',
-    Status: 'Completed',
-    Items: [
-      { P_Code: 'KY-08', Product_Name: 'Crispy Fried Chicken Inasal with Rice', Quantity: 2, Price: 85, SubTotal: 170 },
-      { P_Code: 'KY-07', Product_Name: 'Creamy Chicken Ala King', Quantity: 2, Price: 99, SubTotal: 198 },
-      { P_Code: 'DK-01', Product_Name: 'Coca-Cola Regular 8oz Bottle', Quantity: 2, Price: 35, SubTotal: 70 },
-    ],
-  },
-  {
-    Order_No: 'ORD-1089',
-    Date_Time: '2026-10-02 11:55:18',
-    Total_Qty: 1,
-    Total_Amount: 185,
-    Order_Type: 'Dine-In',
-    Payment_Method: 'Card',
-    Customer_Name: 'Table 05 - Sarah L.',
-    Status: 'Completed',
-    Items: [
-      { P_Code: 'SIG-02', Product_Name: 'Sizzling Sisig Pork Meal with Rice & Egg', Quantity: 1, Price: 185, SubTotal: 185 },
+    id: 'ord-19',
+    orderNumber: '#F0019',
+    tableNumber: 'Table 09',
+    itemCount: 2,
+    timeAgo: '25 mins ago',
+    status: 'Ready',
+    colorTheme: 'purple',
+    orderType: 'Take Away',
+    guestCount: 1,
+    items: [
+      { dishId: 'd-1', name: 'Grilled Salmon Steak', quantity: 1, price: 15.0 },
+      { dishId: 'd-6', name: 'Apple Stuffed Pancake', quantity: 1, price: 35.0 },
     ],
   },
 ];
 
-const INITIAL_STOCK_LOGS: StockLog[] = [
-  { Sin_ID: 101, Date_time: '2026-10-01 08:30:00', Product_code: 'KY-04', P_name: 'Crispy Sizzling Pork Sisig Solo', Quantity: 50, Cost_Price: 85, Supplier: 'Fresh Meats Metro' },
-  { Sin_ID: 102, Date_time: '2026-10-01 08:45:00', Product_code: 'KY-08', P_name: 'Crispy Fried Chicken Inasal with Rice', Quantity: 40, Cost_Price: 48, Supplier: 'Bacolod Poultry Supply' },
-  { Sin_ID: 103, Date_time: '2026-10-01 09:00:00', Product_code: 'DK-01', P_name: 'Coca-Cola Regular 8oz Bottle', Quantity: 120, Cost_Price: 18, Supplier: 'Metro Beverages Inc.' },
-  { Sin_ID: 104, Date_time: '2026-10-01 09:15:00', Product_code: 'BS-01', P_name: 'Batchoy Special', Quantity: 35, Cost_Price: 80, Supplier: 'Iloilo Noodle Craft' },
-  { Sin_ID: 105, Date_time: '2026-10-02 08:00:00', Product_code: 'KY-01', P_name: 'Chori Sandwich', Quantity: 30, Cost_Price: 110, Supplier: 'Artisan Bakery Hub' },
+// ─── Initial Reservations matching top-left screen ─────────────────────────
+const INITIAL_RESERVATIONS: TableReservation[] = [
+  {
+    id: 'res-1',
+    time: '7:30 PM',
+    name: 'Uthman ibn Hunaif',
+    table: 'Table 1',
+    guests: 6,
+    phone: '+84 678 890 000',
+    tag: 'Dinner',
+    status: 'Payment',
+    type: 'Reservation',
+  },
+  {
+    id: 'res-2',
+    time: 'On Dine',
+    name: 'Bashir ibn Sa\'ad',
+    table: 'Table 2',
+    guests: 2,
+    tag: 'On Dine',
+    status: 'On Dine',
+    type: 'On Dine',
+  },
+  {
+    id: 'res-3',
+    time: '8:00 PM',
+    name: 'Ali',
+    table: 'Table 3',
+    guests: 2,
+    phone: '+84 342 556 555',
+    tag: 'Dinner',
+    status: 'Payment',
+    type: 'Reservation',
+  },
+  {
+    id: 'res-4',
+    time: 'On Dine',
+    name: 'Khunais ibn Hudhafa',
+    table: 'Table 4',
+    guests: 3,
+    tag: 'On Dine',
+    status: 'On Dine',
+    type: 'On Dine',
+  },
+  {
+    id: 'res-5',
+    time: 'Free',
+    name: 'Available Now',
+    table: 'Table 5',
+    guests: 0,
+    tag: 'Free',
+    status: 'Free',
+    type: 'All',
+  },
+  {
+    id: 'res-6',
+    time: '8:25 PM',
+    name: 'Mus\'ab ibn Umayr',
+    table: 'Table 6',
+    guests: 7,
+    phone: '+84 800 563 554',
+    tag: 'Dinner',
+    status: 'Unpaid',
+    type: 'Reservation',
+  },
+  {
+    id: 'res-7',
+    time: '9:00 PM',
+    name: 'Shuja ibn Wahb',
+    table: 'Table 5',
+    guests: 10,
+    tag: 'Dinner',
+    status: 'Paid',
+    type: 'Reservation',
+  },
 ];
 
-const INITIAL_ACCOUNTS: StaffAccount[] = [
-  { ACC_ID: 1, Acc_Name: 'Kyle Administrator', User_ID: 'admin', Role: 'Admin', Date_Time: '2026-09-01 09:00:00' },
-  { ACC_ID: 2, Acc_Name: 'Supervisor Mark', User_ID: 'manager', Role: 'Manager', Date_Time: '2026-09-05 14:15:00' },
-  { ACC_ID: 3, Acc_Name: 'Front Cashier Joy', User_ID: 'cashier1', Role: 'Cashier', Date_Time: '2026-09-10 08:20:00' },
+// ─── Initial Floor Tables matching top-left screen layout ──────────────────
+const INITIAL_FLOOR_TABLES: FloorTable[] = [
+  { id: 'tbl-1', name: 'Table #1', zone: 'Main Dining', capacity: 6, status: 'available' },
+  { id: 'tbl-2', name: 'Table #2', zone: 'Main Dining', capacity: 2, status: 'ondine' },
+  { id: 'tbl-3', name: 'Table #3', zone: 'Main Dining', capacity: 2, status: 'available' },
+  { id: 'tbl-4', name: 'Table #4', zone: 'Main Dining', capacity: 3, status: 'ondine' },
+  { id: 'tbl-5', name: 'Table #5', zone: 'Main Dining', capacity: 0, status: 'reserved' },
+  { id: 'tbl-6', name: 'Table #6', zone: 'Main Dining', capacity: 7, status: 'available' },
+  { id: 'tbl-7', name: 'Table #7', zone: 'Terrace', capacity: 4, status: 'reserved' },
+  { id: 'tbl-8', name: 'Table #8', zone: 'Outdoor', capacity: 4, status: 'available' },
 ];
 
-const CATEGORIES_LIST = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'sizzling', label: 'Sizzling & Mains' },
-  { value: 'inasal', label: 'Inasal' },
-  { value: 'batchoy', label: 'Batchoy Specials' },
-  { value: 'sandwiches', label: 'Sandwiches' },
-  { value: 'appetizers', label: 'Appetizers' },
-  { value: 'rice', label: 'Rice & Sides' },
-  { value: 'drinks', label: 'Drinks & Shakes' },
-  { value: 'others', label: 'Others' },
-];
-
-function AdminContent() {
+function AdminPortalApp() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Navigation tab: products | reports | transactions | stockin | settings
-  const tabParam = searchParams.get('tab') || 'products';
-  const [activeTab, setActiveTab] = useState<string>(tabParam);
+  // Active Navigation Screen: 'order-line' | 'manage-table' | 'manage-dishes' | 'dashboard' | 'customers' | 'settings'
+  const initialNav = searchParams.get('tab') === 'settings' ? 'settings' : 'order-line';
+  const [activeNav, setActiveNav] = useState<string>(initialNav);
 
-  // Submenu state
-  const [isTxSubmenuOpen, setIsTxSubmenuOpen] = useState(false);
-  const [txFilterType, setTxFilterType] = useState<'all' | 'sales' | 'purchase'>('all');
+  // Search in Top Bar
+  const [globalSearch, setGlobalSearch] = useState('');
 
-  // Search filter
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  // ─── 1. State for ORDER LINE screen ───────────────────────────────────────
+  const [activeStatusFilter, setActiveStatusFilter] = useState<'All' | 'Dine in' | 'Wait List' | 'Take Away' | 'Served'>('All');
+  const [activeMenuCat, setActiveMenuCat] = useState<string>('special');
+  const [orderCards, setOrderCards] = useState<OrderLineCard[]>(INITIAL_ORDER_CARDS);
+  const [selectedOrder, setSelectedOrder] = useState<OrderLineCard | null>(null);
+  const [activeOrderItems, setActiveOrderItems] = useState<{ [dishId: string]: number }>({
+    'd-3': 2,
+    'd-5': 2,
+    'd-6': 1,
+    'd-8': 1,
+  });
+  const [tableNumber, setTableNumber] = useState('04');
+  const [orderNumber, setOrderNumber] = useState('#F0030');
+  const [guestCount, setGuestCount] = useState(2);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Card' | 'Scan'>('Card');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // State data
-  const [products, setProducts] = useState<AdminProduct[]>([]);
-  const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
-  const [stockLogs, setStockLogs] = useState<StockLog[]>([]);
-  const [accounts, setAccounts] = useState<StaffAccount[]>([]);
-  const [loading, setLoading] = useState(false);
+  // ─── 2. State for MANAGE TABLE screen ─────────────────────────────────────
+  const [tableResFilter, setTableResFilter] = useState<'All' | 'Reservation' | 'On Dine'>('All');
+  const [tableZone, setTableZone] = useState<'Main Dining' | 'Terrace' | 'Outdoor'>('Main Dining');
+  const [reservations, setReservations] = useState<TableReservation[]>(INITIAL_RESERVATIONS);
+  const [floorTables, setFloorTables] = useState<FloorTable[]>(INITIAL_FLOOR_TABLES);
+  const [customerSearch, setCustomerSearch] = useState('');
 
-  // Modals
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
-  const [showStockInModal, setShowStockInModal] = useState(false);
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [receiptOrder, setReceiptOrder] = useState<SalesRecord | null>(null);
-  const [previewImage, setPreviewImage] = useState<{ src: string; name: string } | null>(null);
+  // ─── 3. State for MANAGE DISHES screen ────────────────────────────────────
+  const [dishesList, setDishesList] = useState<Dish[]>(INITIAL_DISHES);
+  const [manageCat, setManageCat] = useState<string>('desserts');
+  const [manageSearch, setManageSearch] = useState('');
+  const [showAddDishModal, setShowAddDishModal] = useState(false);
+  const [newDishName, setNewDishName] = useState('');
+  const [newDishPrice, setNewDishPrice] = useState('');
+  const [newDishCategory, setNewDishCategory] = useState('desserts');
+  const [newDishTag, setNewDishTag] = useState('Dessert');
 
-  // Form states for Add / Edit product
-  const [pCode, setPCode] = useState('');
-  const [pName, setPName] = useState('');
-  const [pCategory, setPCategory] = useState('sizzling');
-  const [sellingPrice, setSellingPrice] = useState('');
-  const [purchasePrice, setPurchasePrice] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [formError, setFormError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  // ─── 4. State for SETTINGS & BRAND screen ──────────────────────────────────
+  const [activeBrandSetting, setActiveBrandSetting] = useState<'batchoy-shop' | 'kyles-eatery' | 'auto'>('auto');
 
-  // Stock In Form
-  const [stockInProductCode, setStockInProductCode] = useState('');
-  const [stockInQty, setStockInQty] = useState('');
-  const [stockInCost, setStockInCost] = useState('');
-  const [stockInSupplier, setStockInSupplier] = useState('');
-
-  // Account Form
-  const [newAccName, setNewAccName] = useState('');
-  const [newUserId, setNewUserId] = useState('');
-  const [newRole, setNewRole] = useState<'Admin' | 'Manager' | 'Cashier'>('Cashier');
-
-  // Live Philippine / Local Clock
-  const [clockTime, setClockTime] = useState('');
-  const [clockDate, setClockDate] = useState('');
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Sync tab with URL
   useEffect(() => {
-    if (tabParam) {
-      setActiveTab(tabParam);
-      if (tabParam === 'transactions' || tabParam === 'stockin') {
-        setIsTxSubmenuOpen(true);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'settings') {
+        setActiveNav('settings');
       }
-    }
-  }, [tabParam]);
-
-  // Load persisted or initial data
-  useEffect(() => {
-    try {
-      const storedProducts = localStorage.getItem('kyleseatery_products');
-      if (storedProducts) {
-        setProducts(JSON.parse(storedProducts));
+      const saved = localStorage.getItem('kyles_active_brand');
+      if (saved === 'batchoy-shop' || saved === 'kyles-eatery') {
+        setActiveBrandSetting(saved);
       } else {
-        setProducts(INITIAL_PRODUCTS);
-        localStorage.setItem('kyleseatery_products', JSON.stringify(INITIAL_PRODUCTS));
+        setActiveBrandSetting('auto');
       }
-
-      const storedSales = localStorage.getItem('kyleseatery_sales');
-      if (storedSales) {
-        setSalesRecords(JSON.parse(storedSales));
-      } else {
-        setSalesRecords(INITIAL_SALES);
-        localStorage.setItem('kyleseatery_sales', JSON.stringify(INITIAL_SALES));
-      }
-
-      const storedStock = localStorage.getItem('kyleseatery_stock');
-      if (storedStock) {
-        setStockLogs(JSON.parse(storedStock));
-      } else {
-        setStockLogs(INITIAL_STOCK_LOGS);
-        localStorage.setItem('kyleseatery_stock', JSON.stringify(INITIAL_STOCK_LOGS));
-      }
-
-      const storedAccounts = localStorage.getItem('kyleseatery_accounts');
-      if (storedAccounts) {
-        setAccounts(JSON.parse(storedAccounts));
-      } else {
-        setAccounts(INITIAL_ACCOUNTS);
-        localStorage.setItem('kyleseatery_accounts', JSON.stringify(INITIAL_ACCOUNTS));
-      }
-    } catch {
-      setProducts(INITIAL_PRODUCTS);
-      setSalesRecords(INITIAL_SALES);
-      setStockLogs(INITIAL_STOCK_LOGS);
-      setAccounts(INITIAL_ACCOUNTS);
     }
   }, []);
 
-  // Clock Ticker
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setClockTime(
-        now.toLocaleTimeString('en-US', {
-          hour12: true,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        })
-      );
-      setClockDate(
-        now.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Save changes to localStorage helper
-  const saveProducts = (updated: AdminProduct[]) => {
-    setProducts(updated);
-    try {
-      localStorage.setItem('kyleseatery_products', JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleNav = (tab: string) => {
-    setActiveTab(tab);
-    router.push(`/admin?tab=${tab}`);
-  };
-
-  // Image Upload handler
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      const localUrl = URL.createObjectURL(file);
-      setImageUrl(localUrl);
-    }
-  };
-
-  // Add Product
-  const handleAddProduct = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    setSubmitting(true);
-
-    if (!pCode.trim() || !pName.trim() || !sellingPrice || !purchasePrice) {
-      setFormError('Please fill out all required fields.');
-      setSubmitting(false);
-      return;
-    }
-
-    if (products.some((p) => p.Product_code.toLowerCase() === pCode.trim().toLowerCase())) {
-      setFormError(`Product code "${pCode.trim()}" already exists.`);
-      setSubmitting(false);
-      return;
-    }
-
-    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const newProd: AdminProduct = {
-      P_code: Date.now(),
-      Product_code: pCode.trim().toUpperCase(),
-      P_name: pName.trim(),
-      P_Category: pCategory,
-      P_S_P: parseFloat(sellingPrice),
-      P_P_P: parseFloat(purchasePrice),
-      P_image: imageUrl || (imageFile ? URL.createObjectURL(imageFile) : null),
-      Date_time: nowStr,
-      is_available: true,
-    };
-
-    const updated = [newProd, ...products];
-    saveProducts(updated);
-
-    // Reset Form
-    setPCode('');
-    setPName('');
-    setPCategory('sizzling');
-    setSellingPrice('');
-    setPurchasePrice('');
-    setImageUrl('');
-    setImageFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setShowAddModal(false);
-    setSubmitting(false);
-  };
-
-  // Open Edit Modal
-  const openEditModal = (p: AdminProduct) => {
-    setEditingProduct(p);
-    setPCode(p.Product_code);
-    setPName(p.P_name);
-    setPCategory(p.P_Category);
-    setSellingPrice(p.P_S_P.toString());
-    setPurchasePrice(p.P_P_P.toString());
-    setImageUrl(p.P_image || '');
-    setFormError('');
-    setShowEditModal(true);
-  };
-
-  // Save Edited Product
-  const handleEditProduct = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingProduct) return;
-    setFormError('');
-
-    const updated = products.map((p) => {
-      if (p.P_code === editingProduct.P_code) {
-        return {
-          ...p,
-          Product_code: pCode.trim().toUpperCase(),
-          P_name: pName.trim(),
-          P_Category: pCategory,
-          P_S_P: parseFloat(sellingPrice) || p.P_S_P,
-          P_P_P: parseFloat(purchasePrice) || p.P_P_P,
-          P_image: imageUrl || p.P_image,
-        };
+  const handleBrandSettingChange = (newSetting: 'batchoy-shop' | 'kyles-eatery' | 'auto') => {
+    setActiveBrandSetting(newSetting);
+    if (typeof window !== 'undefined') {
+      if (newSetting === 'auto') {
+        localStorage.removeItem('kyles_active_brand');
+        document.cookie = 'kyles_active_brand=; Max-Age=0; path=/';
+      } else {
+        localStorage.setItem('kyles_active_brand', newSetting);
+        document.cookie = `kyles_active_brand=${newSetting}; path=/; max-age=31536000`;
       }
-      return p;
+      setToastMessage(
+        `Active brand set to ${
+          newSetting === 'auto'
+            ? 'Automatic Schedule'
+            : newSetting === 'batchoy-shop'
+            ? 'Batchoy Shop (Red Theme)'
+            : "Kyle's Eatery (Orange Theme)"
+        }`
+      );
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  // Handle Order Selection from Carousel
+  const handleSelectOrderCard = (card: OrderLineCard) => {
+    setSelectedOrder(card);
+    setTableNumber(card.tableNumber.replace(/\D/g, '') || '01');
+    setOrderNumber(card.orderNumber);
+    setGuestCount(card.guestCount);
+
+    const itemsMap: { [dishId: string]: number } = {};
+    card.items.forEach((item) => {
+      itemsMap[item.dishId] = item.quantity;
     });
-
-    saveProducts(updated);
-    setShowEditModal(false);
-    setEditingProduct(null);
+    setActiveOrderItems(itemsMap);
   };
 
-  // Delete Product
-  const handleDeleteProduct = (pCodeNum: number, pNameStr: string) => {
-    if (confirm(`Are you sure you want to delete product "${pNameStr}"?`)) {
-      const updated = products.filter((p) => p.P_code !== pCodeNum);
-      saveProducts(updated);
+  // Stepper quantity update in Order Line
+  const handleUpdateItemQty = (dish: Dish, delta: number) => {
+    setActiveOrderItems((prev) => {
+      const currentQty = prev[dish.id] || 0;
+      const nextQty = Math.max(0, currentQty + delta);
+      const updated = { ...prev };
+      if (nextQty === 0) {
+        delete updated[dish.id];
+      } else {
+        updated[dish.id] = nextQty;
+      }
+      return updated;
+    });
+  };
+
+  // Place Order in Order Line
+  const handlePlaceOrder = () => {
+    const list = Object.entries(activeOrderItems);
+    if (list.length === 0) {
+      alert('Please add dishes to the order before placing.');
+      return;
     }
-  };
-
-  // Toggle Availability
-  const handleToggleAvailability = (pCodeNum: number) => {
-    const updated = products.map((p) =>
-      p.P_code === pCodeNum ? { ...p, is_available: !p.is_available } : p
-    );
-    saveProducts(updated);
-  };
-
-  // Add Stock In
-  const handleAddStockIn = (e: React.FormEvent) => {
-    e.preventDefault();
-    const targetProd = products.find((p) => p.Product_code === stockInProductCode);
-    if (!targetProd) return;
-
-    const newLog: StockLog = {
-      Sin_ID: Date.now(),
-      Date_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      Product_code: targetProd.Product_code,
-      P_name: targetProd.P_name,
-      Quantity: parseInt(stockInQty) || 1,
-      Cost_Price: parseFloat(stockInCost) || targetProd.P_P_P,
-      Supplier: stockInSupplier.trim() || 'Central Commissary',
+    const newOrderNumber = `#F00${Math.floor(10 + Math.random() * 90)}`;
+    const newCard: OrderLineCard = {
+      id: `ord-${Date.now()}`,
+      orderNumber: newOrderNumber,
+      tableNumber: `Table ${tableNumber}`,
+      itemCount: list.reduce((sum, [, q]) => sum + q, 0),
+      timeAgo: 'Just Now',
+      status: 'In Kitchen',
+      colorTheme: 'mint',
+      orderType: 'Dine in',
+      guestCount,
+      items: list.map(([id, q]) => {
+        const dish = dishesList.find((d) => d.id === id);
+        return {
+          dishId: id,
+          name: dish ? dish.name : 'Custom Dish',
+          quantity: q,
+          price: dish ? dish.price : 10.0,
+        };
+      }),
     };
 
-    const updated = [newLog, ...stockLogs];
-    setStockLogs(updated);
-    try {
-      localStorage.setItem('kyleseatery_stock', JSON.stringify(updated));
-    } catch {}
-
-    setStockInProductCode('');
-    setStockInQty('');
-    setStockInCost('');
-    setStockInSupplier('');
-    setShowStockInModal(false);
+    setOrderCards([newCard, ...orderCards]);
+    setSelectedOrder(newCard);
+    setOrderNumber(newOrderNumber);
+    setToastMessage(`Order ${newOrderNumber} placed successfully for Table ${tableNumber}!`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Add User Account
-  const handleAddAccount = (e: React.FormEvent) => {
+  // Create new dish in Manage Dishes
+  const handleCreateNewDish = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAccName.trim() || !newUserId.trim()) return;
+    if (!newDishName.trim()) return;
 
-    const newAcc: StaffAccount = {
-      ACC_ID: Date.now(),
-      Acc_Name: newAccName.trim(),
-      User_ID: newUserId.trim().toLowerCase(),
-      Role: newRole,
-      Date_Time: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    const newDish: Dish = {
+      id: `d-${Date.now()}`,
+      name: newDishName.trim(),
+      category: newDishCategory,
+      tag: newDishTag.trim() || 'Food',
+      price: parseFloat(newDishPrice) || 12.0,
+      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80',
     };
 
-    const updated = [...accounts, newAcc];
-    setAccounts(updated);
-    try {
-      localStorage.setItem('kyleseatery_accounts', JSON.stringify(updated));
-    } catch {}
-
-    setNewAccName('');
-    setNewUserId('');
-    setShowAccountModal(false);
+    setDishesList([newDish, ...dishesList]);
+    setShowAddDishModal(false);
+    setNewDishName('');
+    setNewDishPrice('');
+    setToastMessage(`Dish "${newDish.name}" added to ${newDishCategory}!`);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Filter Products
-  const filteredProducts = products.filter((p) => {
-    const term = searchQuery.toLowerCase();
-    const matchesSearch =
-      p.Product_code.toLowerCase().includes(term) ||
-      p.P_name.toLowerCase().includes(term) ||
-      p.P_Category.toLowerCase().includes(term);
-    const matchesCategory =
-      selectedCategory === 'all' || p.P_Category.toLowerCase() === selectedCategory;
-    return matchesSearch && matchesCategory;
+  // Computations for active order checkout
+  const orderedList = Object.entries(activeOrderItems)
+    .map(([dishId, quantity]) => {
+      const dish = dishesList.find((d) => d.id === dishId);
+      if (!dish || quantity <= 0) return null;
+      return {
+        dishId,
+        dish,
+        quantity,
+        subtotal: dish.price * quantity,
+      };
+    })
+    .filter(Boolean) as { dishId: string; dish: Dish; quantity: number; subtotal: number }[];
+
+  const totalItemsCount = orderedList.reduce((sum, i) => sum + i.quantity, 0);
+  const subtotal = orderedList.reduce((sum, i) => sum + i.subtotal, 0);
+  const tax = subtotal > 0 ? 4.0 : 0.0;
+  const donation = subtotal > 0 ? 1.0 : 0.0;
+  const totalPayable = subtotal > 0 ? subtotal + tax + donation : 0.0;
+
+  // Filtered dishes for Order Line
+  const filteredOrderLineDishes = dishesList.filter((d) => {
+    const matchCat =
+      activeMenuCat === 'all' ||
+      d.category === activeMenuCat ||
+      (activeMenuCat === 'special' && d.isSpecial);
+    const matchSearch =
+      d.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      d.tag.toLowerCase().includes(globalSearch.toLowerCase());
+    return matchCat && matchSearch;
   });
 
-  // Calculate Reports KPI Metrics
-  const totalRevenue = salesRecords.reduce((sum, s) => sum + s.Total_Amount, 0);
-  const totalOrdersCount = salesRecords.length;
-  const avgTicket = totalOrdersCount > 0 ? totalRevenue / totalOrdersCount : 0;
-  const totalItemsSold = salesRecords.reduce((sum, s) => sum + s.Total_Qty, 0);
+  // Filtered dishes for Manage Dishes screen
+  const filteredManageDishes = dishesList.filter((d) => {
+    const matchCat = manageCat === 'all' || d.category === manageCat;
+    const matchSearch = d.name.toLowerCase().includes(manageSearch.toLowerCase());
+    return matchCat && matchSearch;
+  });
+
+  // Filtered reservations for Manage Table screen
+  const filteredReservations = reservations.filter((r) => {
+    const matchType = tableResFilter === 'All' || r.type === tableResFilter;
+    const matchSearch =
+      r.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      r.table.toLowerCase().includes(customerSearch.toLowerCase());
+    return matchType && matchSearch;
+  });
+
+  // Filtered floor plan tables by zone
+  const filteredFloorTables = floorTables.filter((t) => t.zone === tableZone);
 
   return (
-    <div className="admin-page-container">
-      <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
-        precedence="default"
-      />
-      {/* ── Topbar (exactly matching admin ui sample with restaurant name: kyleseatery) ── */}
-      <header className="topbar">
-        {/* Brand logo and name */}
-        <div className="topbar-brand">
-          <i className="ti ti-flame topbar-brand-icon"></i>
-          <span className="topbar-brand-name">kyleseatery</span>
+    <div className="tasty-admin-wrapper">
+      {/* ──────────────────────────────────────────────────────────────────
+          LEFT NAVIGATION SIDEBAR (Exact design with kyleseatery)
+          ────────────────────────────────────────────────────────────────── */}
+      <aside className="tasty-sidebar">
+        {/* Brand Logo */}
+        <div className="tasty-logo-container" onClick={() => router.push('/')}>
+          <div className="tasty-logo-icon">
+            <Flame size={20} />
+          </div>
+          <span className="tasty-logo-text">kyleseatery</span>
         </div>
 
-        {/* Search */}
-        <div className="topbar-search">
-          <i className="ti ti-search topbar-search-icon"></i>
-          <input
-            type="text"
-            placeholder="Search products, records, or orders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="topbar-search-input"
-          />
-        </div>
-
-        {/* Right side controls */}
-        <div className="topbar-right">
-          {/* Quick link to Customer Menu */}
-          <Link
-            href="/"
-            className="topbar-icon-btn"
-            title="Open Customer Table Menu"
-            target="_blank"
+        {/* Navigation Items */}
+        <ul className="tasty-nav-menu">
+          <li
+            className={`tasty-nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveNav('dashboard')}
           >
-            <i className="ti ti-external-link"></i>
-          </Link>
+            <LayoutGrid size={18} />
+            <span>Dashboard</span>
+          </li>
 
-          <button
-            className="topbar-icon-btn"
-            aria-label="Notifications"
-            onClick={() => alert('kyleseatery Admin: All systems active and synchronized.')}
+          <li
+            className={`tasty-nav-item ${activeNav === 'order-line' ? 'active' : ''}`}
+            onClick={() => setActiveNav('order-line')}
           >
-            <i className="ti ti-bell"></i>
-          </button>
+            <Receipt size={18} />
+            <span>Order Line</span>
+          </li>
+
+          <li
+            className={`tasty-nav-item ${activeNav === 'manage-table' ? 'active' : ''}`}
+            onClick={() => setActiveNav('manage-table')}
+          >
+            <Rows3 size={18} />
+            <span>Manage Table</span>
+          </li>
+
+          <li
+            className={`tasty-nav-item ${activeNav === 'manage-dishes' ? 'active' : ''}`}
+            onClick={() => setActiveNav('manage-dishes')}
+          >
+            <UtensilsCrossed size={18} />
+            <span>Manage Dishes</span>
+          </li>
+
+          <li
+            className={`tasty-nav-item ${activeNav === 'customers' ? 'active' : ''}`}
+            onClick={() => setActiveNav('customers')}
+          >
+            <Users size={18} />
+            <span>Customers</span>
+          </li>
+        </ul>
+
+        {/* Sidebar Bottom Nav */}
+        <div className="tasty-sidebar-bottom">
+          <div
+            className={`tasty-nav-item ${activeNav === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveNav('settings')}
+          >
+            <Settings size={18} />
+            <span>Settings</span>
+          </div>
 
           <div
-            className="topbar-user"
-            onClick={() => handleNav('settings')}
-            title="Administrator Settings"
+            className="tasty-nav-item"
+            onClick={() => alert('kyleseatery Help Center: All POS systems online and active.')}
           >
-            <div className="topbar-avatar">K</div>
-            <span className="topbar-username">Admin</span>
-            <i className="ti ti-chevron-down topbar-chevron"></i>
+            <CircleHelp size={18} />
+            <span>Help Center</span>
           </div>
-        </div>
-      </header>
 
-      {/* ── Sidebar (matching admin ui sample navigation) ── */}
-      <aside className="sidebar">
-        <ul>
-          {/* Reports */}
-          <li
-            className={activeTab === 'reports' ? 'active' : ''}
-            onClick={() => handleNav('reports')}
-          >
-            <i className="ti ti-chart-bar"></i>
-            Reports
-          </li>
-
-          {/* Products (Masterlist) */}
-          <li
-            className={activeTab === 'products' ? 'active' : ''}
-            onClick={() => handleNav('products')}
-          >
-            <i className="ti ti-burger"></i>
-            Products
-          </li>
-
-          {/* Transactions (with submenu) */}
-          <li className="has-submenu">
-            <div
-              className={`submenu-header ${
-                activeTab === 'transactions' || activeTab === 'stockin' ? 'active' : ''
-              }`}
-              onClick={() => {
-                handleNav('transactions');
-                setTxFilterType('all');
-              }}
-            >
-              <i className="ti ti-receipt"></i>
-              Transactions
-              <i
-                className={`ti ti-chevron-${isTxSubmenuOpen ? 'up' : 'down'}`}
-                style={{ marginLeft: 'auto', fontSize: '12px' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsTxSubmenuOpen(!isTxSubmenuOpen);
-                }}
-              ></i>
-            </div>
-            {isTxSubmenuOpen && (
-              <ul className="submenu-list">
-                <li
-                  className={
-                    activeTab === 'transactions' && txFilterType === 'all'
-                      ? 'submenu-active'
-                      : ''
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNav('transactions');
-                    setTxFilterType('all');
-                  }}
-                >
-                  <i className="ti ti-point" style={{ fontSize: '10px' }}></i>
-                  All Transactions
-                </li>
-                <li
-                  className={
-                    activeTab === 'transactions' && txFilterType === 'sales'
-                      ? 'submenu-active'
-                      : ''
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNav('transactions');
-                    setTxFilterType('sales');
-                  }}
-                >
-                  <i className="ti ti-point" style={{ fontSize: '10px' }}></i>
-                  Sales Order
-                </li>
-                <li
-                  className={activeTab === 'stockin' ? 'submenu-active' : ''}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNav('stockin');
-                  }}
-                >
-                  <i className="ti ti-point" style={{ fontSize: '10px' }}></i>
-                  Purchase Order
-                </li>
-              </ul>
-            )}
-          </li>
-
-          {/* Settings */}
-          <li
-            className={activeTab === 'settings' ? 'active' : ''}
-            onClick={() => handleNav('settings')}
-          >
-            <i className="ti ti-settings"></i>
-            Settings
-          </li>
-
-          {/* POS & Operations Section Divider */}
-          <li
-            style={{
-              padding: '16px 20px 4px',
-              fontSize: '11px',
-              textTransform: 'uppercase',
-              letterSpacing: '1.5px',
-              color: 'var(--text-muted)',
-              cursor: 'default',
-              fontWeight: 700,
-            }}
-          >
-            Operations
-          </li>
-
-          {/* Cashier Terminal */}
-          <li onClick={() => router.push('/pos')}>
-            <i className="ti ti-device-ipad"></i>
-            Cashier POS
-          </li>
-
-          {/* Live Orders Tracker */}
-          <li onClick={() => router.push('/orders?staff=true')}>
-            <i className="ti ti-clipboard-list"></i>
-            Orders Tracker
-          </li>
-
-          {/* Customer Table Menu */}
-          <li onClick={() => router.push('/')}>
-            <i className="ti ti-shopping-bag"></i>
-            Customer Menu
-          </li>
-
-          {/* Kitchen KDS */}
-          <li onClick={() => router.push('/pos')}>
-            <i className="ti ti-tools-kitchen-2"></i>
-            Kitchen KDS
-          </li>
-
-          {/* Logout */}
-          <li
-            className="logout-item"
+          <div
+            className="tasty-nav-item"
             onClick={() => {
-              if (confirm('Sign out from kyleseatery admin panel?')) {
+              if (confirm('Log out from kyleseatery admin panel?')) {
                 router.push('/');
               }
             }}
           >
-            <i className="ti ti-logout"></i>
-            Logout
-          </li>
-        </ul>
-
-        {/* User Profile Badge */}
-        <div className="user-profile-badge">
-          <div className="avatar">K</div>
-          <div className="info">
-            <div className="name">kyleseatery Admin</div>
-            <div className="role">Administrator</div>
+            <LogOut size={18} />
+            <span>Logout</span>
           </div>
         </div>
       </aside>
 
-      {/* ── Main Content Area ── */}
-      <main className="main-content">
-        {/* ==================================================================== */}
-        {/* TAB 1: PRODUCTS / MASTERLIST (Default Admin Page)                     */}
-        {/* ==================================================================== */}
-        {activeTab === 'products' && (
-          <div>
-            {/* Header Actions */}
-            <div className="header-actions">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <h1 style={{ margin: 0 }}>Products Masterlist</h1>
-                <div style={{ display: 'flex', gap: '8px' }}>
+      {/* ──────────────────────────────────────────────────────────────────
+          CENTER / MAIN AREA
+          ────────────────────────────────────────────────────────────────── */}
+      <main className="tasty-main-area">
+        {/* Sticky Topbar */}
+        <header className="tasty-topbar">
+          <div className="tasty-search-box">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search menu, orders and more"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              className="tasty-search-input"
+            />
+          </div>
+
+          <div className="tasty-topbar-right">
+            <button className="tasty-notif-btn" aria-label="Notifications">
+              <Bell size={18} />
+            </button>
+
+            <div className="tasty-user-profile" onClick={() => setActiveNav('settings')}>
+              <div className="tasty-user-avatar">IK</div>
+              <div className="tasty-user-info">
+                <span className="tasty-user-name">Ibrahim Kadri</span>
+                <span className="tasty-user-role">Admin</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Toast Feedback */}
+        {toastMessage && (
+          <div
+            style={{
+              margin: '16px 28px 0',
+              background: '#0d9488',
+              color: '#ffffff',
+              padding: '12px 20px',
+              borderRadius: '14px',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span>{toastMessage}</span>
+            <button
+              onClick={() => setToastMessage(null)}
+              style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Content View Switching */}
+        <div className="tasty-body-row">
+        <div className="tasty-content-body">
+          {/* ================================================================
+              SCREEN 1: ORDER LINE (FRONT SCREEN)
+              ================================================================ */}
+          {activeNav === 'order-line' && (
+            <>
+              {/* Order Line Header */}
+              <section className="tasty-order-line-header">
+                <h2 className="tasty-section-title">Order Line</h2>
+
+                <div className="tasty-status-pills">
                   <button
-                    onClick={() => setViewMode('list')}
-                    title="List View"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '8px',
-                      background: viewMode === 'list' ? 'rgba(234, 106, 18, 0.1)' : 'transparent',
-                      border:
-                        viewMode === 'list'
-                          ? '1px solid var(--primary)'
-                          : '1px solid var(--border)',
-                      color: viewMode === 'list' ? 'var(--primary)' : '#adb5bd',
-                      cursor: 'pointer',
-                      transition: 'var(--transition)',
-                      fontSize: '18px',
-                    }}
+                    className={`tasty-pill-btn ${activeStatusFilter === 'All' ? 'active' : ''}`}
+                    onClick={() => setActiveStatusFilter('All')}
                   >
-                    <i className="ti ti-list"></i>
+                    <span>All</span>
+                    <span className="tasty-pill-count count-all">74</span>
                   </button>
+
                   <button
-                    onClick={() => setViewMode('grid')}
-                    title="Grid View"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '8px',
-                      background: viewMode === 'grid' ? 'rgba(234, 106, 18, 0.1)' : 'transparent',
-                      border:
-                        viewMode === 'grid'
-                          ? '1px solid var(--primary)'
-                          : '1px solid var(--border)',
-                      color: viewMode === 'grid' ? 'var(--primary)' : '#adb5bd',
-                      cursor: 'pointer',
-                      transition: 'var(--transition)',
-                      fontSize: '18px',
-                    }}
+                    className={`tasty-pill-btn ${activeStatusFilter === 'Dine in' ? 'active' : ''}`}
+                    onClick={() => setActiveStatusFilter('Dine in')}
                   >
-                    <i className="ti ti-layout-grid"></i>
+                    <span>Dine in</span>
+                    <span className="tasty-pill-count count-dine">64</span>
+                  </button>
+
+                  <button
+                    className={`tasty-pill-btn ${activeStatusFilter === 'Wait List' ? 'active' : ''}`}
+                    onClick={() => setActiveStatusFilter('Wait List')}
+                  >
+                    <span>Wait List</span>
+                    <span className="tasty-pill-count count-wait">05</span>
+                  </button>
+
+                  <button
+                    className={`tasty-pill-btn ${activeStatusFilter === 'Take Away' ? 'active' : ''}`}
+                    onClick={() => setActiveStatusFilter('Take Away')}
+                  >
+                    <span>Take Away</span>
+                    <span className="tasty-pill-count count-take">12</span>
+                  </button>
+
+                  <button
+                    className={`tasty-pill-btn ${activeStatusFilter === 'Served' ? 'active' : ''}`}
+                    onClick={() => setActiveStatusFilter('Served')}
+                  >
+                    <span>Served</span>
+                    <span className="tasty-pill-count count-served">99</span>
                   </button>
                 </div>
-              </div>
 
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  className="add-new-btn"
-                  onClick={() => {
-                    setFormError('');
-                    setShowAddModal(true);
-                  }}
-                >
-                  <i className="ti ti-plus" style={{ fontSize: '16px' }}></i> Add new product
-                </button>
-              </div>
-            </div>
+                {/* Horizontal Order Cards */}
+                <div className="tasty-order-cards-carousel">
+                  <div className="tasty-order-cards-row">
+                    {orderCards
+                      .filter((c) => activeStatusFilter === 'All' || c.orderType === activeStatusFilter)
+                      .slice(0, 3)
+                      .map((card) => (
+                        <div
+                          key={card.id}
+                          className={`tasty-order-card card-${card.colorTheme} ${
+                            selectedOrder?.id === card.id ? 'selected' : ''
+                          }`}
+                          onClick={() => handleSelectOrderCard(card)}
+                        >
+                          <div className="tasty-order-card-header">
+                            <span className="order-id-label">Order {card.orderNumber}</span>
+                            <span className="table-tag-label">{card.tableNumber}</span>
+                          </div>
 
-            {/* Category Filter Pills */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '10px',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                marginBottom: '25px',
-              }}
-            >
-              {CATEGORIES_LIST.map((cat) => (
-                <button
-                  key={cat.value}
-                  onClick={() => setSelectedCategory(cat.value)}
-                  style={{
-                    padding: '8px 18px',
-                    borderRadius: '20px',
-                    border: 'none',
-                    background:
-                      selectedCategory === cat.value ? 'rgba(234, 106, 18, 0.1)' : '#ffffff',
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor:
-                      selectedCategory === cat.value ? 'var(--primary)' : 'var(--border)',
-                    color: selectedCategory === cat.value ? 'var(--primary)' : '#5c636a',
-                    fontSize: '13px',
-                    fontWeight: selectedCategory === cat.value ? '600' : '500',
-                    cursor: 'pointer',
-                    transition: 'var(--transition)',
-                    fontFamily: "'Poppins', sans-serif",
-                  }}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
+                          <div className="tasty-order-card-body">Item: {card.itemCount}X</div>
 
-            {/* List / Table View */}
-            {filteredProducts.length === 0 ? (
-              <div
-                className="table-wrapper"
-                style={{ textAlign: 'center', padding: '60px 20px', color: '#888' }}
-              >
-                <i
-                  className="ti ti-package-off"
-                  style={{
-                    fontSize: '52px',
-                    color: 'var(--primary)',
-                    marginBottom: '15px',
-                    display: 'block',
-                  }}
-                ></i>
-                <h3 style={{ color: 'var(--text-dark)', marginBottom: '8px' }}>
-                  No products found
-                </h3>
-                <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-                  No menu dishes match &ldquo;{searchQuery}&rdquo;. Try another filter or add a new
-                  product.
-                </p>
-              </div>
-            ) : viewMode === 'list' ? (
-              <div className="table-wrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '70px' }}>Image</th>
-                      <th>Product Code</th>
-                      <th>Dish Name</th>
-                      <th>Category</th>
-                      <th>Selling Price</th>
-                      <th>Purchase Price</th>
-                      <th>Status</th>
-                      <th>Date Added</th>
-                      <th style={{ textAlign: 'center', width: '130px' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProducts.map((p) => (
-                      <tr key={p.P_code}>
-                        <td>
-                          {p.P_image ? (
-                            <img
-                              src={p.P_image.startsWith('/') ? p.P_image : `/${p.P_image}`}
-                              alt={p.P_name}
-                              style={{
-                                width: '48px',
-                                height: '48px',
-                                objectFit: 'cover',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border)',
-                                cursor: 'pointer',
-                              }}
-                              onClick={() =>
-                                setPreviewImage({
-                                  src: p.P_image?.startsWith('/') ? p.P_image : `/${p.P_image}`,
-                                  name: p.P_name,
-                                })
-                              }
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/assets/finallogo.png';
-                              }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: '48px',
-                                height: '48px',
-                                borderRadius: '8px',
-                                background: '#fff4eb',
-                                border: '1px solid #ffd8be',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '20px',
-                                color: 'var(--primary)',
-                              }}
+                          <div className="tasty-order-card-footer">
+                            <span className="order-time-text">{card.timeAgo}</span>
+                            <span
+                              className={`order-status-pill ${
+                                card.status === 'In Kitchen'
+                                  ? 'status-kitchen'
+                                  : card.status === 'Wait List'
+                                  ? 'status-wait'
+                                  : card.status === 'Ready'
+                                  ? 'status-ready'
+                                  : 'status-served'
+                              }`}
                             >
-                              🍔
-                            </div>
-                          )}
-                        </td>
-                        <td
-                          style={{
-                            fontWeight: '700',
-                            fontFamily: 'monospace',
-                            color: 'var(--text-dark)',
-                          }}
-                        >
-                          {p.Product_code}
-                        </td>
-                        <td style={{ color: 'var(--text-dark)', fontWeight: '600' }}>{p.P_name}</td>
-                        <td>
-                          <span
-                            className="badge badge-role"
-                            style={{ textTransform: 'capitalize' }}
-                          >
-                            {p.P_Category}
-                          </span>
-                        </td>
-                        <td
-                          style={{
-                            fontWeight: '700',
-                            color: 'var(--primary)',
-                            fontSize: '15px',
-                          }}
-                        >
-                          ₱{Number(p.P_S_P).toFixed(2)}
-                        </td>
-                        <td style={{ color: 'var(--success)', fontWeight: '600' }}>
-                          ₱{Number(p.P_P_P).toFixed(2)}
-                        </td>
-                        <td>
-                          <button
-                            onClick={() => handleToggleAvailability(p.P_code)}
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: '20px',
-                              border: 'none',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              background:
-                                p.is_available !== false
-                                  ? 'rgba(40, 167, 69, 0.15)'
-                                  : 'rgba(220, 53, 69, 0.15)',
-                              color: p.is_available !== false ? '#28a745' : '#dc3545',
-                              transition: 'var(--transition)',
-                            }}
-                          >
-                            {p.is_available !== false ? '● In Stock' : '○ Out of Stock'}
-                          </button>
-                        </td>
-                        <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                          {p.Date_time.split(' ')[0]}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'center',
-                              gap: '8px',
-                            }}
-                          >
+                              {card.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  <button
+                    className="tasty-carousel-nav-btn"
+                    title="Next Orders"
+                    onClick={() => {
+                      setOrderCards((prev) => [...prev.slice(1), prev[0]]);
+                    }}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </section>
+
+              {/* Foodies Menu Section */}
+              <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="tasty-menu-header">
+                  <h2 className="tasty-section-title">Foodies Menu</h2>
+                  <div className="tasty-carousel-arrows">
+                    <button
+                      className="tasty-arrow-btn"
+                      onClick={() => {
+                        const cats = ['all', 'special', 'soups', 'desserts', 'chickens'];
+                        const idx = cats.indexOf(activeMenuCat);
+                        setActiveMenuCat(idx > 0 ? cats[idx - 1] : cats[cats.length - 1]);
+                      }}
+                      title="Previous Category"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      className="tasty-arrow-btn"
+                      onClick={() => {
+                        const cats = ['all', 'special', 'soups', 'desserts', 'chickens'];
+                        const idx = cats.indexOf(activeMenuCat);
+                        setActiveMenuCat(idx < cats.length - 1 ? cats[idx + 1] : cats[0]);
+                      }}
+                      title="Next Category"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Categories */}
+                <div className="tasty-categories-row">
+                  <div
+                    className={`tasty-category-card ${activeMenuCat === 'all' ? 'active' : ''}`}
+                    onClick={() => setActiveMenuCat('all')}
+                  >
+                    <span className="tasty-category-icon">🍲</span>
+                    <div className="tasty-category-info">
+                      <span className="tasty-category-name">All Menu</span>
+                      <span className="tasty-category-count">154 Items</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`tasty-category-card ${activeMenuCat === 'special' ? 'active' : ''}`}
+                    onClick={() => setActiveMenuCat('special')}
+                  >
+                    <span className="tasty-category-icon">🎂</span>
+                    <div className="tasty-category-info">
+                      <span className="tasty-category-name">Special</span>
+                      <span className="tasty-category-count">19 Items</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`tasty-category-card ${activeMenuCat === 'soups' ? 'active' : ''}`}
+                    onClick={() => setActiveMenuCat('soups')}
+                  >
+                    <span className="tasty-category-icon">🥣</span>
+                    <div className="tasty-category-info">
+                      <span className="tasty-category-name">Soups</span>
+                      <span className="tasty-category-count">3 Items</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`tasty-category-card ${activeMenuCat === 'desserts' ? 'active' : ''}`}
+                    onClick={() => setActiveMenuCat('desserts')}
+                  >
+                    <span className="tasty-category-icon">🍰</span>
+                    <div className="tasty-category-info">
+                      <span className="tasty-category-name">Desserts</span>
+                      <span className="tasty-category-count">19 Items</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`tasty-category-card ${activeMenuCat === 'chickens' ? 'active' : ''}`}
+                    onClick={() => setActiveMenuCat('chickens')}
+                  >
+                    <span className="tasty-category-icon">🍗</span>
+                    <div className="tasty-category-info">
+                      <span className="tasty-category-name">Chickens</span>
+                      <span className="tasty-category-count">10 Items</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dish Cards Grid */}
+                <div className="tasty-dishes-grid">
+                  {filteredOrderLineDishes.slice(0, 8).map((dish) => {
+                    const qty = activeOrderItems[dish.id] || 0;
+                    return (
+                      <div
+                        key={dish.id}
+                        className={`tasty-dish-card ${qty > 0 ? 'active-order' : ''}`}
+                      >
+                        <div className="tasty-dish-img-center">
+                          <img src={dish.imageUrl} alt={dish.name} className="tasty-dish-img" />
+                        </div>
+
+                        <div>
+                          <span className="tasty-dish-category">{dish.tag}</span>
+                          <h4 className="tasty-dish-name" title={dish.name}>{dish.name}</h4>
+                        </div>
+
+                        <div className="tasty-dish-bottom">
+                          <span className="tasty-dish-price">${dish.price.toFixed(2)}</span>
+
+                          <div className="tasty-stepper">
                             <button
-                              className="info-btn"
-                              style={{
-                                padding: '6px 10px',
-                                fontSize: '13px',
-                                borderRadius: '8px',
-                              }}
-                              onClick={() => openEditModal(p)}
-                              title="Edit product"
+                              className="tasty-step-btn"
+                              onClick={() => handleUpdateItemQty(dish, -1)}
+                              disabled={qty === 0}
+                              style={{ opacity: qty === 0 ? 0.4 : 1 }}
                             >
-                              <i className="ti ti-edit"></i>
+                              <Minus size={12} />
                             </button>
+                            <span className="tasty-step-qty">{qty}</span>
                             <button
-                              className="danger-btn"
-                              style={{
-                                padding: '6px 10px',
-                                fontSize: '13px',
-                                borderRadius: '8px',
-                              }}
-                              onClick={() => handleDeleteProduct(p.P_code, p.P_name)}
-                              title="Delete product"
+                              className="tasty-step-btn plus-btn"
+                              onClick={() => handleUpdateItemQty(dish, 1)}
                             >
-                              <i className="ti ti-trash"></i>
+                              <Plus size={12} />
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              /* Grid Cards Layout */
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-                  gap: '22px',
-                  paddingBottom: '40px',
-                }}
-              >
-                {filteredProducts.map((p) => (
-                  <div
-                    key={p.P_code}
-                    className="stat-card"
-                    style={{
-                      textAlign: 'left',
-                      padding: '18px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                    }}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* ================================================================
+              SCREEN 2: MANAGE TABLE (TOP-LEFT SCREEN)
+              ================================================================ */}
+          {activeNav === 'manage-table' && (
+            <div className="tasty-tables-layout">
+              {/* Left Reservations / Queue Sub-panel */}
+              <div className="tasty-reservations-col">
+                <div className="tasty-res-filter-row">
+                  <button
+                    className={`tasty-res-filter-btn ${tableResFilter === 'All' ? 'active' : ''}`}
+                    onClick={() => setTableResFilter('All')}
                   >
-                    {/* Image / Icon container */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        height: '140px',
-                        borderRadius: '12px',
-                        background: '#f8f9fa',
-                        border: '1px solid var(--border)',
-                        overflow: 'hidden',
-                        position: 'relative',
-                      }}
-                    >
-                      {p.P_image ? (
-                        <img
-                          src={p.P_image.startsWith('/') ? p.P_image : `/${p.P_image}`}
-                          alt={p.P_name}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                          }}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/assets/finallogo.png';
-                          }}
-                        />
-                      ) : (
-                        <div style={{ fontSize: '48px' }}>🍔</div>
-                      )}
-                      <span
-                        style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          background:
-                            p.is_available !== false ? 'rgba(0, 0, 0, 0.7)' : 'rgba(220,53,69,0.9)',
-                          color: '#fff',
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                        }}
-                      >
-                        {p.is_available !== false ? 'IN STOCK' : 'OUT OF STOCK'}
+                    <span>All</span>
+                    <span style={{ fontSize: '11px', opacity: 0.8 }}>12</span>
+                  </button>
+                  <button
+                    className={`tasty-res-filter-btn ${tableResFilter === 'Reservation' ? 'active' : ''}`}
+                    onClick={() => setTableResFilter('Reservation')}
+                  >
+                    <span>Reservation</span>
+                    <span style={{ fontSize: '11px', opacity: 0.8 }}>07</span>
+                  </button>
+                  <button
+                    className={`tasty-res-filter-btn ${tableResFilter === 'On Dine' ? 'active' : ''}`}
+                    onClick={() => setTableResFilter('On Dine')}
+                  >
+                    <span>On Dine</span>
+                    <span style={{ fontSize: '11px', opacity: 0.8 }}>05</span>
+                  </button>
+                </div>
+
+                {/* Date Picker */}
+                <div className="tasty-date-picker-row">
+                  <ChevronLeft size={16} style={{ cursor: 'pointer', color: '#64748b' }} />
+                  <span>Thu, 11 January 2024</span>
+                  <ChevronRight size={16} style={{ cursor: 'pointer', color: '#64748b' }} />
+                </div>
+
+                {/* Search Customers */}
+                <div className="tasty-search-box" style={{ width: '100%', padding: '6px 14px' }}>
+                  <Search size={14} style={{ color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    placeholder="Search customers"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="tasty-search-input"
+                  />
+                </div>
+
+                {/* Reservations List */}
+                <div className="tasty-res-list">
+                  {filteredReservations.map((res) => (
+                    <div key={res.id} className="tasty-res-card">
+                      <div className="tasty-res-top">
+                        <span
+                          className={`tasty-time-pill ${
+                            res.status === 'On Dine'
+                              ? 'time-orange'
+                              : res.status === 'Free'
+                              ? 'time-blue'
+                              : 'time-teal'
+                          }`}
+                        >
+                          {res.time}
+                        </span>
+                        <span
+                          className={`tasty-res-tag ${
+                            res.status === 'Payment' || res.status === 'Paid'
+                              ? 'tag-payment'
+                              : res.status === 'On Dine' || res.status === 'Unpaid'
+                              ? 'tag-ondine'
+                              : 'tag-free'
+                          }`}
+                        >
+                          {res.status}
+                        </span>
+                      </div>
+
+                      <div className="tasty-res-name">{res.name}</div>
+
+                      <div className="tasty-res-meta">
+                        <span>{res.table}</span>
+                        <span>•</span>
+                        <span>{res.guests} Guests</span>
+                        {res.phone && (
+                          <>
+                            <span>•</span>
+                            <span style={{ fontSize: '11px' }}>{res.phone}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add New Reservation Button */}
+                <button
+                  className="tasty-add-res-btn"
+                  onClick={() => {
+                    const name = prompt('Guest Name:');
+                    if (name) {
+                      const newRes: TableReservation = {
+                        id: `res-${Date.now()}`,
+                        time: '8:45 PM',
+                        name,
+                        table: 'Table 7',
+                        guests: 4,
+                        phone: '+84 900 123 456',
+                        tag: 'Dinner',
+                        status: 'Payment',
+                        type: 'Reservation',
+                      };
+                      setReservations([newRes, ...reservations]);
+                    }
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>Add New Reservation</span>
+                </button>
+              </div>
+
+              {/* Right Table Map (Floor Plan) */}
+              <div className="tasty-floorplan-col">
+                <div className="tasty-floorplan-header">
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
+                      Manage Tables
+                    </h3>
+                    <div className="tasty-floor-legends" style={{ marginTop: '8px' }}>
+                      <span>
+                        <span className="legend-dot legend-available"></span>Available
+                      </span>
+                      <span>
+                        <span className="legend-dot legend-reserved"></span>Reserved
+                      </span>
+                      <span>
+                        <span className="legend-dot legend-ondine"></span>On Dine
                       </span>
                     </div>
-
-                    {/* Details */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <span
-                          className="badge badge-role"
-                          style={{
-                            fontSize: '11px',
-                            padding: '3px 8px',
-                            textTransform: 'capitalize',
-                          }}
-                        >
-                          {p.P_Category}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            color: 'var(--text-muted)',
-                            fontFamily: 'monospace',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {p.Product_code}
-                        </span>
-                      </div>
-
-                      <h3
-                        style={{
-                          fontSize: '16px',
-                          fontWeight: '700',
-                          color: 'var(--text-dark)',
-                          marginTop: '6px',
-                          lineHeight: '1.3',
-                        }}
-                      >
-                        {p.P_name}
-                      </h3>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          marginTop: '10px',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontSize: '13px',
-                          }}
-                        >
-                          <span style={{ color: 'var(--text-muted)' }}>Selling Price:</span>
-                          <span style={{ fontWeight: '700', color: 'var(--primary)' }}>
-                            ₱{Number(p.P_S_P).toFixed(2)}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontSize: '13px',
-                          }}
-                        >
-                          <span style={{ color: 'var(--text-muted)' }}>Cost Price:</span>
-                          <span style={{ color: 'var(--success)', fontWeight: '600' }}>
-                            ₱{Number(p.P_P_P).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action footer */}
-                    <div
-                      style={{
-                        borderTop: '1px solid var(--border)',
-                        paddingTop: '12px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <button
-                        className="info-btn"
-                        style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '8px' }}
-                        onClick={() => openEditModal(p)}
-                      >
-                        <i className="ti ti-edit"></i> Edit
-                      </button>
-                      <button
-                        className="danger-btn"
-                        style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '8px' }}
-                        onClick={() => handleDeleteProduct(p.P_code, p.P_name)}
-                      >
-                        <i className="ti ti-trash"></i> Delete
-                      </button>
-                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* ==================================================================== */}
-        {/* TAB 2: REPORTS & ANALYTICS                                           */}
-        {/* ==================================================================== */}
-        {activeTab === 'reports' && (
-          <div>
-            <div className="header-actions">
-              <div>
-                <h1 style={{ margin: 0 }}>Sales & Analytics Reports</h1>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Overview of restaurant sales, order trends, and payment reconciliations.
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  className="report-action-btn"
-                  onClick={() => window.print()}
-                  title="Print Reports"
-                >
-                  <i className="ti ti-printer"></i> Print Report
-                </button>
-                <button
-                  className="add-new-btn"
-                  onClick={() => alert('Sales report data exported to CSV successfully.')}
-                >
-                  <i className="ti ti-download"></i> Export CSV
-                </button>
-              </div>
-            </div>
-
-            {/* Summary Stat Cards */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '20px',
-                marginBottom: '30px',
-              }}
-            >
-              <div className="stat-card">
-                <i
-                  className="ti ti-cash"
-                  style={{ fontSize: '28px', color: 'var(--primary)', marginBottom: '8px' }}
-                ></i>
-                <h3>Total Sales Revenue</h3>
-                <p
-                  style={{
-                    fontSize: '26px',
-                    fontWeight: 700,
-                    color: 'var(--primary)',
-                    marginTop: '6px',
-                  }}
-                >
-                  ₱{totalRevenue.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="stat-card">
-                <i
-                  className="ti ti-receipt"
-                  style={{ fontSize: '28px', color: '#02a488', marginBottom: '8px' }}
-                ></i>
-                <h3>Completed Orders</h3>
-                <p
-                  style={{
-                    fontSize: '26px',
-                    fontWeight: 700,
-                    color: '#02a488',
-                    marginTop: '6px',
-                  }}
-                >
-                  {totalOrdersCount}
-                </p>
-              </div>
-
-              <div className="stat-card">
-                <i
-                  className="ti ti-scale"
-                  style={{ fontSize: '28px', color: '#17a2b8', marginBottom: '8px' }}
-                ></i>
-                <h3>Average Ticket Size</h3>
-                <p
-                  style={{
-                    fontSize: '26px',
-                    fontWeight: 700,
-                    color: '#17a2b8',
-                    marginTop: '6px',
-                  }}
-                >
-                  ₱{avgTicket.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="stat-card">
-                <i
-                  className="ti ti-tools-kitchen-2"
-                  style={{ fontSize: '28px', color: '#fd7e14', marginBottom: '8px' }}
-                ></i>
-                <h3>Total Dishes Served</h3>
-                <p
-                  style={{
-                    fontSize: '26px',
-                    fontWeight: 700,
-                    color: '#fd7e14',
-                    marginTop: '6px',
-                  }}
-                >
-                  {totalItemsSold} Items
-                </p>
-              </div>
-            </div>
-
-            {/* Sales Orders History Table */}
-            <div className="table-wrapper">
-              <div
-                style={{
-                  padding: '20px',
-                  borderBottom: '1px solid var(--border)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: 'var(--text-dark)',
-                  }}
-                >
-                  Recent Sales Receipts & Orders
-                </h3>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Total {salesRecords.length} records recorded
-                </span>
-              </div>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>Order No</th>
-                    <th>Date & Time</th>
-                    <th>Customer / Table</th>
-                    <th>Order Type</th>
-                    <th>Payment Method</th>
-                    <th>Items Qty</th>
-                    <th>Total Paid</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'center' }}>Official Receipt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {salesRecords.map((sale) => (
-                    <tr key={sale.Order_No}>
-                      <td
-                        style={{
-                          fontWeight: '700',
-                          fontFamily: 'monospace',
-                          color: 'var(--text-dark)',
-                        }}
+                  {/* Zone Tabs */}
+                  <div className="tasty-zones-toggle">
+                    {(['Main Dining', 'Terrace', 'Outdoor'] as const).map((z) => (
+                      <button
+                        key={z}
+                        className={`zone-pill-btn ${tableZone === z ? 'active' : ''}`}
+                        onClick={() => setTableZone(z)}
                       >
-                        {sale.Order_No}
-                      </td>
-                      <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                        {sale.Date_Time}
-                      </td>
-                      <td style={{ fontWeight: 600, color: 'var(--text-dark)' }}>
-                        {sale.Customer_Name}
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            sale.Order_Type === 'Dine-In' ? 'badge-dinein' : 'badge-takeout'
-                          }`}
-                        >
-                          {sale.Order_Type}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            sale.Payment_Method === 'Cash'
-                              ? 'badge-cash'
-                              : sale.Payment_Method === 'Card'
-                              ? 'badge-card'
-                              : 'badge-qrs'
-                          }`}
-                        >
-                          {sale.Payment_Method}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{sale.Total_Qty} items</td>
-                      <td
-                        style={{
-                          fontWeight: 700,
-                          color: 'var(--primary)',
-                          fontSize: '15px',
-                        }}
+                        {z}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2D Table Floor Plan Grid */}
+                <div className="tasty-floorplan-grid">
+                  {filteredFloorTables.map((tbl) => (
+                    <div
+                      key={tbl.id}
+                      className="tasty-table-seat-container"
+                      onClick={() => {
+                        const nextStatus =
+                          tbl.status === 'available'
+                            ? 'ondine'
+                            : tbl.status === 'ondine'
+                            ? 'reserved'
+                            : 'available';
+                        setFloorTables((prev) =>
+                          prev.map((t) => (t.id === tbl.id ? { ...t, status: nextStatus } : t))
+                        );
+                      }}
+                      title="Click to toggle status"
+                    >
+                      {/* Top Chairs */}
+                      <div className="tasty-chairs-row">
+                        {Array.from({ length: Math.ceil(tbl.capacity / 2) }).map((_, i) => (
+                          <div key={i} className="tasty-chair-icon"></div>
+                        ))}
+                      </div>
+
+                      {/* Table Surface */}
+                      <div
+                        className={`tasty-table-surface ${
+                          tbl.status === 'available'
+                            ? 'table-surface-mint'
+                            : tbl.status === 'ondine'
+                            ? 'table-surface-peach'
+                            : 'table-surface-blue'
+                        }`}
                       >
-                        ₱{sale.Total_Amount.toFixed(2)}
-                      </td>
-                      <td>
-                        <span className="badge badge-stockin">{sale.Status}</span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button
-                          className="report-action-btn"
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                          onClick={() => setReceiptOrder(sale)}
-                        >
-                          <i className="ti ti-receipt"></i> View OR
-                        </button>
-                      </td>
-                    </tr>
+                        <span className="tasty-table-name">{tbl.name}</span>
+                        <span className="tasty-table-capacity">
+                          <User size={12} />
+                          {tbl.capacity} Seats
+                        </span>
+                      </div>
+
+                      {/* Bottom Chairs */}
+                      <div className="tasty-chairs-row">
+                        {Array.from({ length: Math.floor(tbl.capacity / 2) }).map((_, i) => (
+                          <div key={i} className="tasty-chair-icon"></div>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================================== */}
-        {/* TAB 3: TRANSACTIONS & STOCK IN LOGS                                  */}
-        {/* ==================================================================== */}
-        {(activeTab === 'transactions' || activeTab === 'stockin') && (
-          <div>
-            <div className="header-actions">
-              <div>
-                <h1 style={{ margin: 0 }}>
-                  {activeTab === 'stockin'
-                    ? 'Purchase Orders & Stock Logs'
-                    : 'Inventory Transactions & Sales'}
-                </h1>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Complete audit trail of sales orders, stock replenishment, and supply receipts.
-                </p>
+                </div>
               </div>
+            </div>
+          )}
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button className="add-new-btn" onClick={() => setShowStockInModal(true)}>
-                  <i className="ti ti-plus"></i> New Purchase Order
+          {/* ================================================================
+              SCREEN 3: MANAGE DISHES (TOP-RIGHT SCREEN)
+              ================================================================ */}
+          {activeNav === 'manage-dishes' && (
+            <div className="tasty-dishes-management-layout">
+              {/* Left Categories Sub-panel */}
+              <div className="tasty-categories-col">
+                <span className="tasty-categories-col-title">Dishes Category</span>
+
+                <div className="tasty-cat-nav-list">
+                  {[
+                    { key: 'all', icon: '🍲', name: 'All Dishes', count: 154 },
+                    { key: 'breakfast', icon: '🍳', name: 'Breakfast', count: 12 },
+                    { key: 'beef', icon: '🥩', name: 'Beef Dishes', count: 6 },
+                    { key: 'biryani', icon: '🍚', name: 'Biryani', count: 5 },
+                    { key: 'chickens', icon: '🍗', name: 'Chicken Dishes', count: 10 },
+                    { key: 'desserts', icon: '🍰', name: 'Desserts', count: 19 },
+                    { key: 'dinner', icon: '🥘', name: 'Dinner', count: 8 },
+                  ].map((cat) => (
+                    <div
+                      key={cat.key}
+                      className={`tasty-cat-nav-item ${manageCat === cat.key ? 'active' : ''}`}
+                      onClick={() => setManageCat(cat.key)}
+                    >
+                      <div className="tasty-cat-left">
+                        <span>{cat.icon}</span>
+                        <span>{cat.name}</span>
+                      </div>
+                      <span className="tasty-cat-badge">{cat.count}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  className="tasty-add-cat-btn"
+                  onClick={() => {
+                    const c = prompt('Enter new category name:');
+                    if (c) alert(`Category "${c}" created successfully.`);
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>Add New Category</span>
                 </button>
               </div>
-            </div>
 
-            {/* Sub-tabs for filter */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '10px',
-                marginBottom: '20px',
-              }}
-            >
-              <button
-                onClick={() => setTxFilterType('all')}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  background: txFilterType === 'all' ? 'var(--primary)' : '#fff',
-                  color: txFilterType === 'all' ? '#fff' : 'var(--text-main)',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'var(--transition)',
-                }}
-              >
-                All Transactions
-              </button>
-              <button
-                onClick={() => setTxFilterType('sales')}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  background: txFilterType === 'sales' ? 'var(--primary)' : '#fff',
-                  color: txFilterType === 'sales' ? '#fff' : 'var(--text-main)',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'var(--transition)',
-                }}
-              >
-                Sales Orders ({salesRecords.length})
-              </button>
-              <button
-                onClick={() => setTxFilterType('purchase')}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  background: txFilterType === 'purchase' ? 'var(--primary)' : '#fff',
-                  color: txFilterType === 'purchase' ? '#fff' : 'var(--text-main)',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'var(--transition)',
-                }}
-              >
-                Purchase Orders ({stockLogs.length})
-              </button>
-            </div>
+              {/* Right Dishes Grid */}
+              <div className="tasty-dishes-main-col">
+                <div className="tasty-dishes-toolbar">
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
+                    {manageCat.charAt(0).toUpperCase() + manageCat.slice(1)} (19)
+                  </h3>
 
-            {/* Transactions Table */}
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Ref / Order ID</th>
-                    <th>Type</th>
-                    <th>Date & Time</th>
-                    <th>Item Description</th>
-                    <th>Quantity</th>
-                    <th>Unit Price / Cost</th>
-                    <th>Subtotal</th>
-                    <th>Source / Method</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Stock Logs (Purchases) */}
-                  {(txFilterType === 'all' || txFilterType === 'purchase') &&
-                    stockLogs.map((log) => (
-                      <tr key={`purchase-${log.Sin_ID}`}>
-                        <td
-                          style={{
-                            fontWeight: '700',
-                            fontFamily: 'monospace',
-                            color: 'var(--text-dark)',
-                          }}
-                        >
-                          #PO-{log.Sin_ID}
-                        </td>
-                        <td>
-                          <span className="badge badge-stockin">Purchase</span>
-                        </td>
-                        <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                          {log.Date_time}
-                        </td>
-                        <td style={{ fontWeight: 600, color: 'var(--text-dark)' }}>
-                          {log.P_name}{' '}
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                            ({log.Product_code})
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 700, color: '#28a745' }}>+{log.Quantity}</td>
-                        <td style={{ color: 'var(--text-main)' }}>
-                          ₱{log.Cost_Price.toFixed(2)} cost
-                        </td>
-                        <td style={{ fontWeight: 700, color: 'var(--text-dark)' }}>
-                          ₱{(log.Quantity * log.Cost_Price).toFixed(2)}
-                        </td>
-                        <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                          {log.Supplier}
-                        </td>
-                      </tr>
-                    ))}
+                  <div className="tasty-dishes-toolbar-right">
+                    <div className="tasty-tool-search">
+                      <Search size={14} />
+                      <input
+                        type="text"
+                        placeholder="Search dishes"
+                        value={manageSearch}
+                        onChange={(e) => setManageSearch(e.target.value)}
+                      />
+                    </div>
 
-                  {/* Sales Records */}
-                  {(txFilterType === 'all' || txFilterType === 'sales') &&
-                    salesRecords.map((sale) => (
-                      <tr key={`sales-${sale.Order_No}`}>
-                        <td
-                          style={{
-                            fontWeight: '700',
-                            fontFamily: 'monospace',
-                            color: 'var(--text-dark)',
-                          }}
-                        >
-                          #{sale.Order_No}
-                        </td>
-                        <td>
-                          <span className="badge badge-cash">Sales</span>
-                        </td>
-                        <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                          {sale.Date_Time}
-                        </td>
-                        <td style={{ fontWeight: 600, color: 'var(--text-dark)' }}>
-                          {sale.Items.map((i) => `${i.Product_Name} (×${i.Quantity})`).join(', ')}
-                        </td>
-                        <td style={{ fontWeight: 700, color: '#dc3545' }}>-{sale.Total_Qty}</td>
-                        <td style={{ color: 'var(--text-main)' }}>Ticket Total</td>
-                        <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                          ₱{sale.Total_Amount.toFixed(2)}
-                        </td>
-                        <td>
-                          <span className="badge badge-role">{sale.Payment_Method}</span>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                    <button className="tasty-tool-btn">
+                      <SlidersHorizontal size={14} />
+                      <span>Filter</span>
+                    </button>
 
-        {/* ==================================================================== */}
-        {/* TAB 4: SETTINGS & ACCOUNTS                                           */}
-        {/* ==================================================================== */}
-        {activeTab === 'settings' && (
-          <div>
-            <div className="header-actions">
-              <div>
-                <h1 style={{ margin: 0 }}>System Settings & Accounts</h1>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Manage kyleseatery restaurant configuration, operating schedule, and staff
-                  credentials.
-                </p>
-              </div>
+                    <button
+                      className="tasty-add-dish-btn"
+                      onClick={() => setShowAddDishModal(true)}
+                    >
+                      <Plus size={15} />
+                      <span>Add New Dishes</span>
+                    </button>
+                  </div>
+                </div>
 
-              <button className="add-new-btn" onClick={() => setShowAccountModal(true)}>
-                <i className="ti ti-user-plus"></i> Add Staff Account
-              </button>
-            </div>
-
-            {/* Restaurant Profile Card & Live Clock */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                gap: '24px',
-                marginBottom: '35px',
-              }}
-            >
-              {/* Profile Card */}
-              <div
-                className="stat-card"
-                style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Manage Dishes Grid with Dashed Add Card */}
+                <div className="tasty-manage-grid">
+                  {/* Dashed Add Card matching image */}
                   <div
+                    className="tasty-dish-add-card"
+                    onClick={() => setShowAddDishModal(true)}
+                  >
+                    <div className="tasty-add-circle">
+                      <Plus size={20} />
+                    </div>
+                    <span className="tasty-add-card-label">
+                      Add New Dish to {manageCat.charAt(0).toUpperCase() + manageCat.slice(1)}
+                    </span>
+                  </div>
+
+                  {/* Dish Cards */}
+                  {filteredManageDishes.map((dish) => (
+                    <div key={dish.id} className="tasty-manage-dish-card">
+                      <div className="tasty-manage-card-top">
+                        <input type="checkbox" className="tasty-checkbox" />
+                        <div
+                          className="tasty-manage-dots"
+                          onClick={() => {
+                            if (confirm(`Delete ${dish.name}?`)) {
+                              setDishesList(dishesList.filter((d) => d.id !== dish.id));
+                            }
+                          }}
+                        >
+                          <MoreVertical size={16} />
+                        </div>
+                      </div>
+
+                      <div className="tasty-dish-img-center">
+                        <img src={dish.imageUrl} alt={dish.name} className="tasty-dish-img" />
+                      </div>
+
+                      <div>
+                        <span className="tasty-dish-category">{dish.tag}</span>
+                        <h4 className="tasty-dish-name" title={dish.name}>{dish.name}</h4>
+                      </div>
+
+                      <span className="tasty-dish-price" style={{ marginTop: 'auto' }}>
+                        ${dish.price.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================
+              SCREEN 4: DASHBOARD / OVERVIEW
+              ================================================================ */}
+          {activeNav === 'dashboard' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <h2 className="tasty-section-title">Dashboard Overview</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '18px' }}>
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '13px', color: '#64748b' }}>Today&apos;s Revenue</span>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0d9488', marginTop: '6px' }}>$1,248.50</div>
+                </div>
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '13px', color: '#64748b' }}>Active Orders</span>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>{orderCards.length}</div>
+                </div>
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '13px', color: '#64748b' }}>Tables Occupied</span>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#ea580c', marginTop: '6px' }}>6 / 12</div>
+                </div>
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '13px', color: '#64748b' }}>Customers Served</span>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a', marginTop: '6px' }}>84</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================
+              SCREEN 5: SETTINGS & SYSTEM
+              ================================================================ */}
+          {activeNav === 'settings' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Brand Switcher Settings Card */}
+              <div style={{ background: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <h2 className="tasty-section-title" style={{ margin: 0 }}>Brand & Ordering Theme Mode</h2>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+                        Switch the active customer ordering brand, menu items, and Japanese visual theme.
+                      </p>
+                    </div>
+                    <a
+                      href="/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        background: '#f1f5f9',
+                        color: '#0f172a',
+                        borderRadius: '10px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        transition: 'all 0.2s',
+                        border: '1px solid #e2e8f0',
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = '#e2e8f0')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = '#f1f5f9')}
+                    >
+                      <span>Preview Customer Menu</span>
+                      <span style={{ fontSize: '14px' }}>↗</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                  {/* Option 1: Batchoy Shop */}
+                  <div
+                    onClick={() => handleBrandSettingChange('batchoy-shop')}
                     style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '12px',
-                      background: 'rgba(234, 106, 18, 0.1)',
+                      cursor: 'pointer',
+                      padding: '16px',
+                      borderRadius: '14px',
+                      border: activeBrandSetting === 'batchoy-shop' ? '2px solid #8d2d2b' : '1px solid #e2e8f0',
+                      background: activeBrandSetting === 'batchoy-shop' ? '#fdf2f2' : '#ffffff',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--primary)',
-                      fontSize: '24px',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: activeBrandSetting === 'batchoy-shop' ? '0 4px 12px rgba(141, 45, 43, 0.12)' : 'none',
                     }}
                   >
-                    <i className="ti ti-flame"></i>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#8d2d2b', display: 'inline-block' }} />
+                        <span style={{ fontWeight: 700, fontSize: '14px', color: '#8d2d2b' }}>Batchoy Shop</span>
+                      </div>
+                      {activeBrandSetting === 'batchoy-shop' && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, background: '#8d2d2b', color: '#ffffff', padding: '2px 8px', borderRadius: '999px' }}>
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                      Crimson red pattern theme with authentic Iloilo Batchoy menu items (₱45–₱199).
+                    </p>
                   </div>
-                  <div>
-                    <h3
-                      style={{
-                        margin: 0,
-                        fontSize: '20px',
-                        fontWeight: 700,
-                        color: 'var(--primary)',
-                      }}
-                    >
-                      kyleseatery
-                    </h3>
-                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-                      Point of Sale & Admin Terminal
+
+                  {/* Option 2: Kyle's Eatery */}
+                  <div
+                    onClick={() => handleBrandSettingChange('kyles-eatery')}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '16px',
+                      borderRadius: '14px',
+                      border: activeBrandSetting === 'kyles-eatery' ? '2px solid #ea580c' : '1px solid #e2e8f0',
+                      background: activeBrandSetting === 'kyles-eatery' ? '#fff7ed' : '#ffffff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: activeBrandSetting === 'kyles-eatery' ? '0 4px 12px rgba(234, 88, 12, 0.12)' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#ea580c', display: 'inline-block' }} />
+                        <span style={{ fontWeight: 700, fontSize: '14px', color: '#ea580c' }}>Kyle&apos;s Eatery</span>
+                      </div>
+                      {activeBrandSetting === 'kyles-eatery' && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, background: '#ea580c', color: '#ffffff', padding: '2px 8px', borderRadius: '999px' }}>
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                      Warm orange & soft white pattern theme with signature comfort food menu.
+                    </p>
+                  </div>
+
+                  {/* Option 3: Auto Schedule */}
+                  <div
+                    onClick={() => handleBrandSettingChange('auto')}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '16px',
+                      borderRadius: '14px',
+                      border: activeBrandSetting === 'auto' ? '2px solid #0d9488' : '1px solid #e2e8f0',
+                      background: activeBrandSetting === 'auto' ? '#f0fdfa' : '#ffffff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: activeBrandSetting === 'auto' ? '0 4px 12px rgba(13, 148, 136, 0.12)' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#0d9488', display: 'inline-block' }} />
+                        <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f766e' }}>Auto (Weekly Schedule)</span>
+                      </div>
+                      {activeBrandSetting === 'auto' && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, background: '#0d9488', color: '#ffffff', padding: '2px 8px', borderRadius: '999px' }}>
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                      Mon–Sat: Kyle&apos;s Eatery | Sunday: Batchoy Shop (Automatic calendar switch).
                     </p>
                   </div>
                 </div>
-
-                <div
-                  style={{
-                    borderTop: '1px solid var(--border)',
-                    paddingTop: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    fontSize: '13px',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Schedule Brand (Mon-Sat):</span>
-                    <strong style={{ color: 'var(--text-dark)' }}>Kyle&apos;s Eatery</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Schedule Brand (Sunday):</span>
-                    <strong style={{ color: 'var(--text-dark)' }}>Batchoy Shop</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Currency System:</span>
-                    <strong style={{ color: 'var(--success)' }}>Philippine Peso (₱ PHP)</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>System Version:</span>
-                    <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                      v2.4.0 Next.js
-                    </span>
-                  </div>
-                </div>
               </div>
 
-              {/* Philippine Time Clock */}
-              <div
-                className="stat-card"
-                style={{
-                  textAlign: 'center',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  Philippine Standard Time (PST)
-                </span>
-                <div
-                  style={{
-                    fontSize: '38px',
-                    fontWeight: 800,
-                    fontFamily: 'monospace',
-                    color: 'var(--primary)',
-                    letterSpacing: '2px',
-                  }}
-                >
-                  {clockTime || '--:--:--'}
+              {/* General System Information Card */}
+              <div style={{ background: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>General System Info</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: '#475569' }}>
+                  <p style={{ margin: 0 }}><strong>Restaurant Account:</strong> kyleseatery</p>
+                  <p style={{ margin: 0 }}><strong>Weekly Schedule:</strong> Mon–Sat Kyle&apos;s Eatery | Sun Batchoy Shop</p>
+                  <p style={{ margin: 0 }}><strong>Currency:</strong> PHP (₱) / USD ($)</p>
+                  <p style={{ margin: 0 }}><strong>Administrator:</strong> Ibrahim Kadri (Admin)</p>
                 </div>
-                <div style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 500 }}>
-                  {clockDate || 'Loading date...'}
-                </div>
-                <span
-                  className="badge badge-stockin"
-                  style={{ marginTop: '6px', fontSize: '11px' }}
-                >
-                  ● System Synced Live
-                </span>
               </div>
             </div>
+          )}
 
-            {/* Accounts Table */}
-            <div className="table-wrapper">
-              <div
-                style={{
-                  padding: '20px',
-                  borderBottom: '1px solid var(--border)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: 'var(--text-dark)',
-                  }}
-                >
-                  Staff Accounts & Permissions
-                </h3>
+          {/* ================================================================
+              SCREEN 6: CUSTOMERS
+              ================================================================ */}
+          {activeNav === 'customers' && (
+            <div style={{ background: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h2 className="tasty-section-title">Customer Directory</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {reservations.map((res) => (
+                  <div key={res.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderRadius: '12px', fontSize: '13px' }}>
+                    <span style={{ fontWeight: 600 }}>{res.name}</span>
+                    <span style={{ color: '#64748b' }}>{res.phone || 'Walk-in'}</span>
+                    <span style={{ color: '#0d9488', fontWeight: 600 }}>{res.table}</span>
+                  </div>
+                ))}
               </div>
+            </div>
+          )}
+        </div>{/* end tasty-content-body */}
 
-              <table>
-                <thead>
-                  <tr>
-                    <th>Account ID</th>
-                    <th>Staff Name</th>
-                    <th>User ID / Username</th>
-                    <th>Assigned Role</th>
-                    <th>Created Date</th>
-                    <th style={{ textAlign: 'center' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.map((acc) => (
-                    <tr key={acc.ACC_ID}>
-                      <td
-                        style={{
-                          fontWeight: 700,
-                          fontFamily: 'monospace',
-                          color: 'var(--text-dark)',
+          {/* ──────────────────────────────────────────────────────────────────
+              RIGHT SIDEBAR (Active Order Checkout matching image)
+              Visible during Order Line
+              ────────────────────────────────────────────────────────────────── */}
+          {activeNav === 'order-line' && (
+            <div className="tasty-order-col">
+
+              {/* ── CARD 1: Order Details ── */}
+              <div className="tasty-order-card-panel">
+                {/* Table No Header */}
+                <div className="tasty-receipt-header">
+                  <div>
+                    <h3 className="table-title">Table No #{tableNumber}</h3>
+                    <span className="order-code-sub">Order {orderNumber}</span>
+                  </div>
+                  <div className="table-header-right">
+                    <div className="table-actions">
+                      <button
+                        className="receipt-icon-btn"
+                        title="Edit Table"
+                        onClick={() => {
+                          const t = prompt('Enter Table Number:', tableNumber);
+                          if (t) setTableNumber(t.padStart(2, '0'));
                         }}
                       >
-                        #{acc.ACC_ID}
-                      </td>
-                      <td style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{acc.Acc_Name}</td>
-                      <td style={{ fontFamily: 'monospace', color: 'var(--primary)' }}>
-                        @{acc.User_ID}
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            acc.Role === 'Admin'
-                              ? 'badge-role'
-                              : acc.Role === 'Manager'
-                              ? 'badge-card'
-                              : 'badge-cash'
-                          }`}
-                        >
-                          {acc.Role}
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        className="receipt-icon-btn trash"
+                        title="Clear Order"
+                        onClick={() => setActiveOrderItems({})}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <span className="table-people-tag">{guestCount} People</span>
+                  </div>
+                </div>
+
+                {/* Ordered Items Header */}
+                <div className="ordered-items-header">
+                  <span className="ordered-items-title">Ordered Items</span>
+                  <span className="ordered-count-tag">{totalItemsCount.toString().padStart(2, '0')}</span>
+                </div>
+
+                {/* Scrollable Items */}
+                <div className="ordered-items-scroll">
+                  {orderedList.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px 10px', color: '#94a3b8', fontSize: '13px' }}>
+                      No dishes added yet. Click &ldquo;+&rdquo; on any dish to build order.
+                    </div>
+                  ) : (
+                    orderedList.map((item) => (
+                      <div key={item.dishId} className="ordered-item-row">
+                        <span className="ordered-item-name">
+                          <span className="ordered-item-qty">{item.quantity}x</span> {item.dish.name}
                         </span>
-                      </td>
-                      <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                        {acc.Date_Time}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button
-                          className="danger-btn"
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                          onClick={() => {
-                            if (acc.Role === 'Admin') {
-                              alert('Cannot remove the primary Administrator account.');
-                              return;
-                            }
-                            if (confirm(`Remove staff account @${acc.User_ID}?`)) {
-                              const updated = accounts.filter((a) => a.ACC_ID !== acc.ACC_ID);
-                              setAccounts(updated);
-                              try {
-                                localStorage.setItem(
-                                  'kyleseatery_accounts',
-                                  JSON.stringify(updated)
-                                );
-                              } catch {}
-                            }
-                          }}
-                        >
-                          <i className="ti ti-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <span className="ordered-item-subtotal">${item.subtotal.toFixed(2)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Payment Summary */}
+                <div className="payment-summary-block">
+                  <h4 className="payment-summary-title">Payment Summery</h4>
+                  <div className="summary-row">
+                    <span>Subtotal</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span>Tax</span>
+                    <span>${tax.toFixed(2)}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span>Donation for Palestine</span>
+                    <span>${donation.toFixed(2)}</span>
+                  </div>
+                  <div className="summary-row total-row">
+                    <span>Total Payable</span>
+                    <span className="total-amount-display">${totalPayable.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── CARD 2: Payment Method ── */}
+              <div className="tasty-payment-method-card">
+                <h4 className="payment-method-title">Payment Method</h4>
+                <div className="payment-methods-grid">
+                  <button
+                    className={`payment-btn ${paymentMethod === 'Cash' ? 'active' : ''}`}
+                    onClick={() => setPaymentMethod('Cash')}
+                  >
+                    <Banknote size={15} />
+                    <span>Cash</span>
+                  </button>
+                  <button
+                    className={`payment-btn ${paymentMethod === 'Card' ? 'active' : ''}`}
+                    onClick={() => setPaymentMethod('Card')}
+                  >
+                    <CreditCard size={15} />
+                    <span>Card</span>
+                  </button>
+                  <button
+                    className={`payment-btn ${paymentMethod === 'Scan' ? 'active' : ''}`}
+                    onClick={() => setPaymentMethod('Scan')}
+                  >
+                    <QrCode size={15} />
+                    <span>Scan</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Bottom Actions ── */}
+              <div className="order-sidebar-actions">
+                <button className="print-btn" onClick={() => window.print()} title="Print Order Receipt">
+                  <Printer size={16} />
+                  <span>Print</span>
+                </button>
+                <button className="place-order-btn" onClick={handlePlaceOrder}>
+                  <Timer size={16} />
+                  <span>Place Order</span>
+                </button>
+              </div>
+
             </div>
-          </div>
-        )}
+          )}
+        </div>{/* end tasty-body-row */}
       </main>
 
-      {/* ==================================================================== */}
-      {/* MODAL 1: ADD PRODUCT MODAL                                           */}
-      {/* ==================================================================== */}
-      {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+
+      {/* ── Add Dish Modal ── */}
+      {showAddDishModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+          onClick={() => setShowAddDishModal(false)}
+        >
           <div
-            className="modal-content"
-            style={{ width: '550px' }}
+            style={{
+              background: '#ffffff',
+              padding: '28px',
+              borderRadius: '20px',
+              width: '440px',
+              maxWidth: '90%',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button className="close-btn" onClick={() => setShowAddModal(false)}>
-              <i className="ti ti-x"></i>
-            </button>
-            <h3
-              style={{
-                marginBottom: '20px',
-                fontFamily: "'Poppins', sans-serif",
-                fontSize: '22px',
-                color: 'var(--primary)',
-                borderBottom: '1px solid var(--border)',
-                paddingBottom: '10px',
-                fontWeight: 700,
-              }}
-            >
-              Add New Product to kyleseatery
+            <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
+              Add New Dish to {manageCat.charAt(0).toUpperCase() + manageCat.slice(1)}
             </h3>
 
-            {formError && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  background: 'rgba(220,53,69,0.1)',
-                  border: '1px solid rgba(220,53,69,0.2)',
-                  color: '#ff4d4d',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  marginBottom: '15px',
-                }}
-              >
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleAddProduct}>
-              <div className="input-group">
-                <label>Product Code / SKU</label>
+            <form onSubmit={handleCreateNewDish} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                  Dish Name
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. KY-15"
-                  value={pCode}
-                  onChange={(e) => setPCode(e.target.value)}
+                  placeholder="e.g. Pistachio Syrniki"
+                  value={newDishName}
+                  onChange={(e) => setNewDishName(e.target.value)}
                   required
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
                 />
               </div>
 
-              <div className="input-group">
-                <label>Dish / Product Name</label>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                  Price ($)
+                </label>
                 <input
-                  type="text"
-                  placeholder="e.g. Sizzling Sisig Pork Meal"
-                  value={pName}
-                  onChange={(e) => setPName(e.target.value)}
+                  type="number"
+                  step="0.01"
+                  placeholder="10.00"
+                  value={newDishPrice}
+                  onChange={(e) => setNewDishPrice(e.target.value)}
                   required
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
                 />
               </div>
 
-              <div className="input-group">
-                <label>Category</label>
-                <select value={pCategory} onChange={(e) => setPCategory(e.target.value)} required>
-                  <option value="sizzling">Sizzling & Mains</option>
-                  <option value="inasal">Inasal</option>
-                  <option value="batchoy">Batchoy Specials</option>
-                  <option value="sandwiches">Sandwiches</option>
-                  <option value="appetizers">Appetizers</option>
-                  <option value="rice">Rice & Sides</option>
-                  <option value="drinks">Drinks & Shakes</option>
-                  <option value="others">Others</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label>Selling Price (₱ PHP)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label>Cost / Purchase Price (₱ PHP)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={purchasePrice}
-                    onChange={(e) => setPurchasePrice(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label>Product Image Upload</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  style={{ padding: '8px' }}
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Or Image Path / URL</label>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                  Tag
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. uploads/SIG01_Sisig_Pork_Solo.jpg"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="e.g. Dessert, Breakfast, Pasta"
+                  value={newDishTag}
+                  onChange={(e) => setNewDishTag(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
                 />
               </div>
 
-              <button
-                type="submit"
-                className="add-new-btn"
-                style={{
-                  width: '100%',
-                  marginTop: '15px',
-                  padding: '14px',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  background: 'var(--primary)',
-                  color: '#fff',
-                  border: 'none',
-                }}
-                disabled={submitting}
-              >
-                {submitting ? 'SAVING PRODUCT...' : 'SAVE PRODUCT'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ==================================================================== */}
-      {/* MODAL 2: EDIT PRODUCT MODAL                                          */}
-      {/* ==================================================================== */}
-      {showEditModal && editingProduct && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div
-            className="modal-content"
-            style={{ width: '550px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setShowEditModal(false)}>
-              <i className="ti ti-x"></i>
-            </button>
-            <h3
-              style={{
-                marginBottom: '20px',
-                fontFamily: "'Poppins', sans-serif",
-                fontSize: '22px',
-                color: 'var(--primary)',
-                borderBottom: '1px solid var(--border)',
-                paddingBottom: '10px',
-                fontWeight: 700,
-              }}
-            >
-              Edit Product Details
-            </h3>
-
-            <form onSubmit={handleEditProduct}>
-              <div className="input-group">
-                <label>Product Code</label>
-                <input
-                  type="text"
-                  value={pCode}
-                  onChange={(e) => setPCode(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Dish / Product Name</label>
-                <input
-                  type="text"
-                  value={pName}
-                  onChange={(e) => setPName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Category</label>
-                <select value={pCategory} onChange={(e) => setPCategory(e.target.value)} required>
-                  <option value="sizzling">Sizzling & Mains</option>
-                  <option value="inasal">Inasal</option>
-                  <option value="batchoy">Batchoy Specials</option>
-                  <option value="sandwiches">Sandwiches</option>
-                  <option value="appetizers">Appetizers</option>
-                  <option value="rice">Rice & Sides</option>
-                  <option value="drinks">Drinks & Shakes</option>
-                  <option value="others">Others</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label>Selling Price (₱ PHP)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label>Cost / Purchase Price (₱ PHP)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={purchasePrice}
-                    onChange={(e) => setPurchasePrice(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label>Image URL / Path</label>
-                <input
-                  type="text"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="e.g. uploads/SIG01_Sisig_Pork_Solo.jpg"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="add-new-btn"
-                style={{
-                  width: '100%',
-                  marginTop: '15px',
-                  padding: '14px',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  background: 'var(--primary)',
-                  color: '#fff',
-                  border: 'none',
-                }}
-              >
-                UPDATE PRODUCT
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ==================================================================== */}
-      {/* MODAL 3: OFFICIAL RECEIPT (OR) MODAL                                 */}
-      {/* ==================================================================== */}
-      {receiptOrder && (
-        <div className="modal-overlay" onClick={() => setReceiptOrder(null)}>
-          <div
-            className="modal-content"
-            style={{ width: '480px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setReceiptOrder(null)}>
-              <i className="ti ti-x"></i>
-            </button>
-
-            {/* Receipt Header */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: 'var(--primary)',
-                  fontSize: '22px',
-                  fontWeight: 800,
-                }}
-              >
-                <i className="ti ti-flame"></i> kyleseatery
-              </div>
-              <p
-                style={{
-                  fontSize: '11px',
-                  letterSpacing: '1px',
-                  color: 'var(--text-muted)',
-                  marginTop: '3px',
-                }}
-              >
-                OFFICIAL SALES RECEIPT
-              </p>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Mon-Sat Kyle&apos;s Eatery • Sun Batchoy Shop
-              </p>
-            </div>
-
-            <div
-              style={{
-                borderTop: '1px dashed var(--border)',
-                borderBottom: '1px dashed var(--border)',
-                padding: '12px 0',
-                marginBottom: '15px',
-                fontSize: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Order Number:</span>
-                <strong style={{ fontFamily: 'monospace' }}>{receiptOrder.Order_No}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Date & Time:</span>
-                <span>{receiptOrder.Date_Time}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Customer:</span>
-                <span>{receiptOrder.Customer_Name}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Type & Payment:</span>
-                <span>
-                  {receiptOrder.Order_Type} • {receiptOrder.Payment_Method}
-                </span>
-              </div>
-            </div>
-
-            {/* Receipt Items */}
-            <div style={{ marginBottom: '15px' }}>
-              <table style={{ width: '100%', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ textAlign: 'left', padding: '6px 0' }}>Item</th>
-                    <th style={{ textAlign: 'center', padding: '6px 0' }}>Qty</th>
-                    <th style={{ textAlign: 'right', padding: '6px 0' }}>Price</th>
-                    <th style={{ textAlign: 'right', padding: '6px 0' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receiptOrder.Items.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px dotted var(--border)' }}>
-                      <td style={{ padding: '8px 0', color: 'var(--text-dark)' }}>
-                        {item.Product_Name}
-                      </td>
-                      <td style={{ textAlign: 'center', padding: '8px 0' }}>{item.Quantity}</td>
-                      <td style={{ textAlign: 'right', padding: '8px 0' }}>
-                        ₱{item.Price.toFixed(2)}
-                      </td>
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          padding: '8px 0',
-                          fontWeight: 700,
-                          color: 'var(--text-dark)',
-                        }}
-                      >
-                        ₱{item.SubTotal.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Total */}
-            <div
-              style={{
-                borderTop: '2px solid var(--border)',
-                paddingTop: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                marginBottom: '20px',
-              }}
-            >
-              <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-dark)' }}>
-                TOTAL AMOUNT PAID:
-              </span>
-              <span
-                style={{
-                  fontSize: '24px',
-                  fontWeight: 800,
-                  color: 'var(--primary)',
-                  fontFamily: 'monospace',
-                }}
-              >
-                ₱{receiptOrder.Total_Amount.toFixed(2)}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                className="add-new-btn"
-                style={{ flex: 1, padding: '10px' }}
-                onClick={() => window.print()}
-              >
-                <i className="ti ti-printer"></i> Print Receipt
-              </button>
-              <button
-                className="report-action-btn"
-                style={{ flex: 1, padding: '10px' }}
-                onClick={() => setReceiptOrder(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================================================================== */}
-      {/* MODAL 4: STOCK IN / PURCHASE ORDER MODAL                             */}
-      {/* ==================================================================== */}
-      {showStockInModal && (
-        <div className="modal-overlay" onClick={() => setShowStockInModal(false)}>
-          <div
-            className="modal-content"
-            style={{ width: '500px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setShowStockInModal(false)}>
-              <i className="ti ti-x"></i>
-            </button>
-            <h3
-              style={{
-                marginBottom: '20px',
-                fontFamily: "'Poppins', sans-serif",
-                fontSize: '22px',
-                color: 'var(--primary)',
-                borderBottom: '1px solid var(--border)',
-                paddingBottom: '10px',
-                fontWeight: 700,
-              }}
-            >
-              New Purchase Order (Stock In)
-            </h3>
-
-            <form onSubmit={handleAddStockIn}>
-              <div className="input-group">
-                <label>Select Product to Restock</label>
-                <select
-                  value={stockInProductCode}
-                  onChange={(e) => {
-                    setStockInProductCode(e.target.value);
-                    const prod = products.find((p) => p.Product_code === e.target.value);
-                    if (prod) setStockInCost(prod.P_P_P.toString());
-                  }}
-                  required
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddDishModal(false)}
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  <option value="">-- Choose Product --</option>
-                  {products.map((p) => (
-                    <option key={p.P_code} value={p.Product_code}>
-                      {p.Product_code} - {p.P_name} (Cost: ₱{p.P_P_P})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label>Quantity In</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 50"
-                    value={stockInQty}
-                    onChange={(e) => setStockInQty(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="input-group" style={{ flex: 1 }}>
-                  <label>Unit Cost (₱)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={stockInCost}
-                    onChange={(e) => setStockInCost(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label>Supplier / Source</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Metro Food Commissary"
-                  value={stockInSupplier}
-                  onChange={(e) => setStockInSupplier(e.target.value)}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="add-new-btn"
-                style={{
-                  width: '100%',
-                  marginTop: '15px',
-                  padding: '14px',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  background: 'var(--primary)',
-                  color: '#fff',
-                  border: 'none',
-                }}
-              >
-                RECORD PURCHASE ORDER
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ==================================================================== */}
-      {/* MODAL 5: ADD STAFF ACCOUNT MODAL                                     */}
-      {/* ==================================================================== */}
-      {showAccountModal && (
-        <div className="modal-overlay" onClick={() => setShowAccountModal(false)}>
-          <div
-            className="modal-content"
-            style={{ width: '480px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setShowAccountModal(false)}>
-              <i className="ti ti-x"></i>
-            </button>
-            <h3
-              style={{
-                marginBottom: '20px',
-                fontFamily: "'Poppins', sans-serif",
-                fontSize: '22px',
-                color: 'var(--primary)',
-                borderBottom: '1px solid var(--border)',
-                paddingBottom: '10px',
-                fontWeight: 700,
-              }}
-            >
-              Add Staff Account
-            </h3>
-
-            <form onSubmit={handleAddAccount}>
-              <div className="input-group">
-                <label>Full Staff Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. John Doe"
-                  value={newAccName}
-                  onChange={(e) => setNewAccName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Username / Login ID</label>
-                <input
-                  type="text"
-                  placeholder="e.g. cashier2"
-                  value={newUserId}
-                  onChange={(e) => setNewUserId(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Role</label>
-                <select
-                  value={newRole}
-                  onChange={(e) =>
-                    setNewRole(e.target.value as 'Admin' | 'Manager' | 'Cashier')
-                  }
-                  required
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#0d9488', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  <option value="Cashier">Cashier</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Admin">Admin</option>
-                </select>
+                  Save Dish
+                </button>
               </div>
-
-              <button
-                type="submit"
-                className="add-new-btn"
-                style={{
-                  width: '100%',
-                  marginTop: '15px',
-                  padding: '14px',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  background: 'var(--primary)',
-                  color: '#fff',
-                  border: 'none',
-                }}
-              >
-                CREATE STAFF ACCOUNT
-              </button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ==================================================================== */}
-      {/* MODAL 6: IMAGE PREVIEW MODAL                                         */}
-      {/* ==================================================================== */}
-      {previewImage && (
-        <div className="modal-overlay" onClick={() => setPreviewImage(null)}>
-          <div
-            className="modal-content"
-            style={{ width: '450px', textAlign: 'center' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="close-btn" onClick={() => setPreviewImage(null)}>
-              <i className="ti ti-x"></i>
-            </button>
-            <h3 style={{ marginBottom: '15px', color: 'var(--text-dark)', fontSize: '18px' }}>
-              {previewImage.name}
-            </h3>
-            <img
-              src={previewImage.src}
-              alt={previewImage.name}
-              style={{
-                maxWidth: '100%',
-                maxHeight: '350px',
-                borderRadius: '12px',
-                objectFit: 'contain',
-              }}
-            />
           </div>
         </div>
       )}
@@ -2617,16 +1752,16 @@ export default function AdminPage() {
             alignItems: 'center',
             justifyContent: 'center',
             height: '100vh',
-            background: 'var(--bg-deep)',
-            color: 'var(--primary)',
+            background: '#f8fafc',
+            color: '#0d9488',
           }}
         >
           <div
             style={{
-              width: '40px',
-              height: '40px',
-              border: '3px solid var(--border)',
-              borderTopColor: 'var(--primary)',
+              width: '36px',
+              height: '36px',
+              border: '3px solid #e2e8f0',
+              borderTopColor: '#0d9488',
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
             }}
@@ -2634,7 +1769,7 @@ export default function AdminPage() {
         </div>
       }
     >
-      <AdminContent />
+      <AdminPortalApp />
     </Suspense>
   );
 }

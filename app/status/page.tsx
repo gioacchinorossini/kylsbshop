@@ -13,35 +13,6 @@ import { Order, OrderStatus } from '@/types/database';
 // ─── Theme ────────────────────────────────────────────────────────────────────
 type Brand = 'kyles-eatery' | 'batchoy-shop';
 
-function detectOrderBrand(order: any): Brand {
-  const notes = (order?.customer_notes || '').toLowerCase();
-  if (notes.includes('batchoy-shop') || notes.includes('batchoy')) return 'batchoy-shop';
-  if (notes.includes('kyles-eatery') || notes.includes('kyles') || notes.includes('kyle')) return 'kyles-eatery';
-
-  const items = order?.order_items || [];
-  for (const item of items) {
-    const name = (item.menu_item_name || '').toLowerCase();
-    if (
-      name.includes('batchoy') ||
-      name.includes('tempura') ||
-      name.includes('miki') ||
-      name.includes('caesar')
-    ) {
-      return 'batchoy-shop';
-    }
-    if (
-      name.includes('chori') ||
-      name.includes('inasal') ||
-      name.includes('bbq') ||
-      name.includes('ala king') ||
-      name.includes('kawali')
-    ) {
-      return 'kyles-eatery';
-    }
-  }
-  return 'kyles-eatery';
-}
-
 const BRAND_THEME = {
   'kyles-eatery': {
     bg: 'bg-white',
@@ -183,44 +154,38 @@ function ProgressStepper({ status, theme }: { status: OrderStatus; theme: Theme 
   );
 }
 
-// ─── Digital receipt (Unified single receipt with item-level badging) ───────
+// ─── Digital receipt ──────────────────────────────────────────────────────────
 function DigitalReceipt({
-  orders,
-  displayTable,
+  order,
+  tableNumber,
   theme,
 }: {
-  orders: Order[];
-  displayTable: string | null;
+  order: Order;
+  tableNumber?: string;
   theme: Theme;
 }) {
-  const firstOrder = orders[0];
-  const rawShortId = firstOrder?.short_id || firstOrder?.order_number || firstOrder?.id?.slice(-4) || '---';
-  const heroOrderTitle = rawShortId.startsWith('#') ? rawShortId : `#${rawShortId}`;
-
-  const timeStr = firstOrder?.created_at
-    ? new Date(firstOrder.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const items = order.order_items ?? [];
+  const timeStr = order.created_at
+    ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
 
-  const grandTotal = orders.reduce(
-    (sum, o) => sum + Number(o.total_amount ?? (o as any).total_price ?? 0),
-    0
-  );
-
-  const hasAnyItems = orders.some(
-    (o) => (o.items && o.items.length > 0) || (o.order_items && o.order_items.length > 0)
-  );
+  const displayTable = order.dining_table
+    ? String(order.dining_table.table_number).padStart(2, '0')
+    : tableNumber
+    ? String(tableNumber).padStart(2, '0')
+    : null;
 
   return (
     <div className="w-full space-y-6">
-      {/* Receipt header with single master ticket number */}
+      {/* Receipt header */}
       <div className="flex items-start justify-between">
         <div>
           <p className={['text-[11px] font-bold uppercase tracking-widest mb-1', theme.subtleText].join(' ')}>
-            Order Ticket
+            Order
           </p>
-          <h1 className="text-4xl font-black font-mono tracking-tight text-red-600 dark:text-red-500">
-            {heroOrderTitle}
-          </h1>
+          <p className={['text-4xl font-black font-mono tracking-tight', theme.accent].join(' ')}>
+            #{order.order_number}
+          </p>
           {timeStr && (
             <p className={['text-xs mt-1.5', theme.subtleText].join(' ')}>Placed at {timeStr}</p>
           )}
@@ -228,68 +193,41 @@ function DigitalReceipt({
         <ReceiptText size={30} strokeWidth={1.3} className={theme.subtleText} />
       </div>
 
-      {/* Unified Items list */}
+      {/* Items list */}
       <div className={['divide-y', theme.divider].join(' ')}>
-        {!hasAnyItems ? (
+        {items.length === 0 ? (
           <p className={['py-4 text-sm', theme.subtleText].join(' ')}>No items available.</p>
         ) : (
-          orders.map((order) => {
-            const normType = (order.order_type || '').toLowerCase().replace(/[_\s]/g, '-');
-            const isTakeout = normType.includes('take') || normType.includes('away');
-            const items = (order.items || order.order_items || []) as any[];
-
-            return items.map((item, itemIdx) => {
-              const itemName = item.menu_item_name || item.name || item.title || 'Item';
-              const itemPrice = Number(
-                item.subtotal ??
-                  (item.unit_price != null
-                    ? item.unit_price * item.quantity
-                    : (item.price != null ? item.price * item.quantity : 0))
-              );
-              const itemKey = item.id || `${order.id}-${itemIdx}`;
-
-              return (
-                <div key={itemKey} className="flex items-baseline justify-between gap-3 py-3.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-y-1">
-                      <p className={['text-sm font-medium', theme.text].join(' ')}>
-                        <span className={['font-mono font-bold mr-1.5 text-[13px]', theme.accent].join(' ')}>
-                          {item.quantity}×
-                        </span>
-                        {itemName}
-                      </p>
-                      <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border bg-zinc-100 border-zinc-200 text-zinc-500 dark:bg-zinc-900/50 dark:border-zinc-800 dark:text-zinc-500 shrink-0">
-                        {isTakeout ? (
-                          <ShoppingBag className="w-2.5 h-2.5 shrink-0 text-zinc-500" strokeWidth={2} />
-                        ) : (
-                          <Utensils className="w-2.5 h-2.5 shrink-0 text-zinc-500" strokeWidth={2} />
-                        )}
-                        <span>{isTakeout ? 'Take-Out' : 'Dine-In'}</span>
-                      </span>
-                    </div>
-                    {(item.special_instructions || item.notes) && (
-                      <p className={['text-[11px] italic mt-0.5 pl-5', theme.subtleText].join(' ')}>
-                        ↳ {item.special_instructions || item.notes}
-                      </p>
-                    )}
-                  </div>
-                  <p className={['text-sm font-mono shrink-0', theme.text].join(' ')}>
-                    ₱{itemPrice.toFixed(2)}
+          items.map((item, i) => (
+            <div key={item.id ?? i} className="flex items-baseline justify-between gap-3 py-3.5">
+              <div className="flex-1 min-w-0">
+                <p className={['text-sm font-medium', theme.text].join(' ')}>
+                  <span className={['font-mono font-bold mr-1.5 text-[13px]', theme.accent].join(' ')}>
+                    {item.quantity}×
+                  </span>
+                  {item.menu_item_name}
+                </p>
+                {item.special_instructions && (
+                  <p className={['text-[11px] italic mt-0.5 pl-5', theme.subtleText].join(' ')}>
+                    ↳ {item.special_instructions}
                   </p>
-                </div>
-              );
-            });
-          })
+                )}
+              </div>
+              <p className={['text-sm font-mono shrink-0', theme.text].join(' ')}>
+                ₱{Number(item.subtotal ?? item.unit_price * item.quantity).toFixed(2)}
+              </p>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Single Total Footer */}
+      {/* Total */}
       <div className="flex items-center justify-between">
         <p className={['text-[11px] font-bold uppercase tracking-widest', theme.subtleText].join(' ')}>
           Total
         </p>
-        <p className={['text-3xl sm:text-4xl font-black font-mono tracking-tight', theme.text].join(' ')}>
-          ₱{grandTotal.toFixed(2)}
+        <p className={['text-3xl font-black font-mono tracking-tight', theme.text].join(' ')}>
+          ₱{Number(order.total_amount).toFixed(2)}
         </p>
       </div>
 
@@ -298,13 +236,11 @@ function DigitalReceipt({
         <p className={['text-[13px] font-medium leading-snug', theme.text].join(' ')}>
           {displayTable ? (
             <>
-              State <strong>Table {displayTable}</strong> &amp; Order{' '}
-              <strong className="text-red-600 dark:text-red-400">{heroOrderTitle}</strong> at the cashier when paying.
+              State <strong>Table {displayTable}</strong> &amp; Order <strong>#{order.order_number}</strong> at the cashier when paying.
             </>
           ) : (
             <>
-              State Order{' '}
-              <strong className="text-red-600 dark:text-red-400">{heroOrderTitle}</strong> at the cashier counter when paying.
+              State Order <strong>#{order.order_number}</strong> at the cashier counter when paying.
             </>
           )}
         </p>
@@ -321,31 +257,10 @@ export function CustomerStatusContent() {
   const rawTableNumber = tableParam ? tableParam.replace(/^table\s*/i, '').trim() : '';
   const brandParam = searchParams.get('brand') as Brand | null;
 
-  // Initialize active brand state strictly from URL search params ('brand') first
-  const [brand, setBrand] = useState<Brand>(() => {
-    if (brandParam === 'batchoy-shop' || brandParam === 'kyles-eatery') {
-      return brandParam;
-    }
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kyles_current_brand');
-      if (stored === 'batchoy-shop' || stored === 'kyles-eatery') {
-        return stored;
-      }
-    }
-    const dayOfWeek = new Date().getDay();
-    return dayOfWeek === 0 ? 'batchoy-shop' : 'kyles-eatery';
-  });
-
-  // Sync state if URL search param changes
-  useEffect(() => {
-    if (brandParam === 'batchoy-shop' || brandParam === 'kyles-eatery') {
-      setBrand(brandParam);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kyles_current_brand', brandParam);
-      }
-    }
-  }, [brandParam]);
-
+  const dayOfWeek = new Date().getDay();
+  const systemBrand: Brand = dayOfWeek === 0 ? 'batchoy-shop' : 'kyles-eatery';
+  const brand: Brand =
+    brandParam === 'batchoy-shop' || brandParam === 'kyles-eatery' ? brandParam : systemBrand;
   const theme = BRAND_THEME[brand];
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -353,143 +268,150 @@ export function CustomerStatusContent() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load orders for table session, gathering from localStorage (@kyle_pos_my_orders), URL params, and table
+  // Load orders for table or single order
   const loadOrders = useCallback(async (isBackground = false) => {
     if (!isBackground) setLoading(true);
     else setIsRefreshing(true);
 
-    const activeBrandFilter =
-      brandParam === 'batchoy-shop' || brandParam === 'kyles-eatery' ? brandParam : brand;
-
     try {
-      // 1. Gather all candidate order IDs
-      const candidateIds: string[] = [];
-      let storedTable: string | null = null;
-
-      if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem('@kyle_pos_my_orders');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              parsed.forEach((id) => {
-                if (typeof id === 'string' && id.trim() && !candidateIds.includes(id.trim())) {
-                  candidateIds.push(id.trim());
-                }
-              });
+      if (rawTableNumber) {
+        // Table view: fetch active orders belonging to this table (excluding archived)
+        const res = await getOrdersByTableAction(rawTableNumber);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const validOrders = res.data.filter(
+            (o) => o.status !== 'Archived' && o.status !== 'archived'
+          );
+          setOrders(validOrders);
+          if (typeof window !== 'undefined') {
+            const activeRemaining = validOrders.filter((o) =>
+              ['pending', 'preparing', 'ready'].includes(o.status)
+            );
+            if (activeRemaining.length === 0) {
+              try {
+                localStorage.removeItem('@kyle_pos_my_orders');
+              } catch {}
             }
           }
-        } catch {}
-
-        storedTable = localStorage.getItem('kyles_current_table');
-        const lastId = localStorage.getItem('kyles_last_order_id');
-        if (lastId && typeof lastId === 'string' && !candidateIds.includes(lastId.trim())) {
-          candidateIds.push(lastId.trim());
-        }
-      }
-
-      if (orderIdParam && !candidateIds.includes(orderIdParam)) {
-        candidateIds.push(orderIdParam);
-      }
-
-      // 2. Fetch all candidate orders by ID
-      const fetchedOrders: Order[] = [];
-      if (candidateIds.length > 0) {
-        const idResults = await Promise.all(
-          candidateIds.map((id) => getOrderByIdAction(id))
-        );
-        idResults.forEach((res) => {
-          if (res.success && res.data) {
-            fetchedOrders.push(res.data);
+          if (validOrders.length > 0) {
+            // Set active order if not already selected, or if current selection not found
+            setActiveOrderId((prev) => {
+              if (prev && validOrders.some((o) => o.id === prev)) return prev;
+              if (orderIdParam && validOrders.some((o) => o.id === orderIdParam)) return orderIdParam;
+              // Prefer first active order, else latest order
+              const active = validOrders.find((o) => ['pending', 'preparing', 'ready'].includes(o.status));
+              return active ? active.id : validOrders[0].id;
+            });
+          } else {
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('@kyle_pos_my_orders');
+                localStorage.removeItem('kyles_last_order_id');
+              } catch {}
+            }
+            setOrders([]);
           }
-        });
-      }
-
-      // 3. Resolve table number if available (from URL, localStorage, or fetched orders)
-      const effectiveTable =
-        rawTableNumber ||
-        storedTable ||
-        fetchedOrders.find((o) => o.dining_table?.table_number)?.dining_table?.table_number?.toString() ||
-        fetchedOrders
-          .map((o) => o.customer_notes?.match(/table\s*(\d+)/i)?.[1])
-          .find(Boolean);
-
-      // 4. If table is known, fetch table orders to ensure any additions at the table are included
-      if (effectiveTable) {
-        const tableRes = await getOrdersByTableAction(effectiveTable, activeBrandFilter);
-        if (tableRes.success && Array.isArray(tableRes.data)) {
-          tableRes.data.forEach((ord) => fetchedOrders.push(ord));
-        }
-      }
-
-      // 5. Merge uniquely by ID
-      const orderMap = new Map<string, Order>();
-      fetchedOrders.forEach((ord) => {
-        if (ord && ord.id) {
-          const items = ord.items || ord.order_items || [];
-          ord.items = items;
-          ord.order_items = items;
-          if (!ord.short_id) {
-            ord.short_id = ord.order_number || ord.id.slice(-4);
+        } else if (orderIdParam) {
+          // Fallback to specific orderId if table query returned nothing
+          const singleRes = await getOrderByIdAction(orderIdParam);
+          if (
+            singleRes.success &&
+            singleRes.data &&
+            singleRes.data.status !== 'Archived' &&
+            singleRes.data.status !== 'archived'
+          ) {
+            setOrders([singleRes.data]);
+            setActiveOrderId(singleRes.data.id);
+          } else {
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('@kyle_pos_my_orders');
+                localStorage.removeItem('kyles_last_order_id');
+              } catch {}
+            }
+            setOrders([]);
           }
-          orderMap.set(ord.id, ord);
-        }
-      });
-
-      let combinedOrders = Array.from(orderMap.values());
-
-      // Filter out archived orders
-      combinedOrders = combinedOrders.filter(
-        (o) => o.status !== 'Archived' && o.status !== 'archived'
-      );
-
-      // Filter by active brand
-      if (activeBrandFilter) {
-        combinedOrders = combinedOrders.filter((o) => detectOrderBrand(o) === activeBrandFilter);
-      }
-
-      // Detect brand if not explicitly provided
-      if (!brandParam && combinedOrders.length > 0) {
-        const detected = detectOrderBrand(combinedOrders[0]);
-        if (detected) setBrand(detected);
-      }
-
-      // Sort chronologically (oldest to newest)
-      combinedOrders.sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
-
-      // 6. Synchronize active orders with localStorage without wiping out multiple active orders
-      if (typeof window !== 'undefined') {
-        try {
-          const activeStatuses = ['pending', 'received', 'preparing', 'ready'];
-          const activeOrders = combinedOrders.filter((o) =>
-            activeStatuses.includes((o.status || '').toLowerCase())
-          );
-          if (activeOrders.length > 0) {
-            const activeIds = activeOrders.map((o) => o.id);
-            localStorage.setItem('@kyle_pos_my_orders', JSON.stringify(activeIds));
-            localStorage.setItem('kyles_last_order_id', activeIds[activeIds.length - 1]);
-          } else if (combinedOrders.length === 0) {
-            localStorage.removeItem('@kyle_pos_my_orders');
-            localStorage.removeItem('kyles_last_order_id');
+        } else {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('@kyle_pos_my_orders');
+              localStorage.removeItem('kyles_last_order_id');
+            } catch {}
           }
-        } catch {}
-      }
+          setOrders([]);
+        }
+      } else if (orderIdParam) {
+        // Single order view
+        const res = await getOrderByIdAction(orderIdParam);
+        if (
+          res.success &&
+          res.data &&
+          res.data.status !== 'Archived' &&
+          res.data.status !== 'archived'
+        ) {
+          setOrders([res.data]);
+          setActiveOrderId(res.data.id);
 
-      setOrders(combinedOrders);
-
-      if (combinedOrders.length > 0) {
-        setActiveOrderId((prev) => {
-          if (prev && combinedOrders.some((o) => o.id === prev)) return prev;
-          if (orderIdParam && combinedOrders.some((o) => o.id === orderIdParam)) return orderIdParam;
-          const active = combinedOrders.find((o) =>
-            ['pending', 'received', 'preparing', 'ready'].includes((o.status || '').toLowerCase())
-          );
-          return active ? active.id : combinedOrders[combinedOrders.length - 1].id;
-        });
+          // If the order has a table, load other orders for this table in the background
+          const matchedTable = res.data.dining_table?.table_number
+            ? String(res.data.dining_table.table_number)
+            : res.data.customer_notes?.replace(/^table\s*/i, '').trim();
+          if (matchedTable) {
+            getOrdersByTableAction(matchedTable).then((tableRes) => {
+              if (tableRes.success && Array.isArray(tableRes.data) && tableRes.data.length > 0) {
+                const validTableOrders = tableRes.data.filter(
+                  (o) => o.status !== 'Archived' && o.status !== 'archived'
+                );
+                if (validTableOrders.length > 0) {
+                  setOrders(validTableOrders);
+                }
+              }
+            });
+          }
+        } else {
+          setOrders([]);
+        }
       } else {
-        setActiveOrderId('');
+        // Neither table nor order in URL: check localStorage for current table or last placed order
+        let storedId: string | null = null;
+        let storedTable: string | null = null;
+        if (typeof window !== 'undefined') {
+          storedTable = localStorage.getItem('kyles_current_table');
+          storedId = localStorage.getItem('kyles_last_order_id');
+        }
+
+        if (storedTable) {
+          const res = await getOrdersByTableAction(storedTable);
+          if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+            const valid = res.data.filter(
+              (o) => o.status !== 'Archived' && o.status !== 'archived'
+            );
+            if (valid.length > 0) {
+              setOrders(valid);
+              setActiveOrderId(valid[0].id);
+              return;
+            }
+          }
+        }
+
+        if (storedId) {
+          const res = await getOrderByIdAction(storedId);
+          if (
+            res.success &&
+            res.data &&
+            res.data.status !== 'Archived' &&
+            res.data.status !== 'archived'
+          ) {
+            setOrders([res.data]);
+            setActiveOrderId(res.data.id);
+          } else {
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('kyles_last_order_id');
+            }
+            setOrders([]);
+          }
+        } else {
+          setOrders([]);
+        }
       }
     } catch {
       setOrders([]);
@@ -497,7 +419,7 @@ export function CustomerStatusContent() {
       if (!isBackground) setLoading(false);
       setIsRefreshing(false);
     }
-  }, [rawTableNumber, orderIdParam, brandParam, brand]);
+  }, [rawTableNumber, orderIdParam]);
 
   useEffect(() => {
     loadOrders(false);
@@ -509,22 +431,6 @@ export function CustomerStatusContent() {
     return orders.find((o) => o.id === activeOrderId) || orders[0];
   }, [orders, activeOrderId]);
 
-  // Session status calculation across all table orders
-  const sessionStatus: OrderStatus = useMemo(() => {
-    if (orders.length === 0) return 'pending';
-    const activeOrders = orders.filter(
-      (o) => o.status !== 'cancelled' && o.status !== 'Archived' && o.status !== 'archived'
-    );
-    if (activeOrders.length === 0) return orders[0].status;
-    const allCompleted = activeOrders.every((o) => o.status === 'completed');
-    if (allCompleted) return 'completed';
-    const allReady = activeOrders.every((o) => o.status === 'ready' || o.status === 'completed');
-    if (allReady) return 'ready';
-    const anyPreparing = activeOrders.some((o) => o.status === 'preparing');
-    if (anyPreparing) return 'preparing';
-    return 'pending';
-  }, [orders]);
-
   // Table ID for realtime
   const resolvedTableId = useMemo(() => {
     const fromOrder = orders.find((o) => o.table_id)?.table_id;
@@ -533,25 +439,22 @@ export function CustomerStatusContent() {
 
   // Live status updates
   useEffect(() => {
-    const unsubscribes: (() => void)[] = [];
-
-    // 1. Subscribe to each individual order in the table session
-    orders.forEach((ord) => {
-      if (ord.id) {
-        const unsub = subscribeToCustomerOrder(ord.id, {
-          onOrderUpdated: (updated) => {
-            setOrders((prev) =>
-              prev.map((o) => (o.id === ord.id ? { ...o, ...updated } : o))
-            );
-          },
-        });
-        unsubscribes.push(unsub);
-      }
-    });
+    // 1. Subscribe to selected single order updates
+    let unsubscribeOrder: (() => void) | undefined;
+    if (activeOrderId) {
+      unsubscribeOrder = subscribeToCustomerOrder(activeOrderId, {
+        onOrderUpdated: (updated) => {
+          setOrders((prev) =>
+            prev.map((o) => (o.id === activeOrderId ? { ...o, ...updated } : o))
+          );
+        },
+      });
+    }
 
     // 2. Subscribe to table events if tableId is known
+    let unsubscribeTable: (() => void) | undefined;
     if (resolvedTableId) {
-      const unsubTable = subscribeToTableOrders(resolvedTableId, {
+      unsubscribeTable = subscribeToTableOrders(resolvedTableId, {
         onOrderUpdated: (updated) => {
           setOrders((prev) =>
             prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o))
@@ -561,13 +464,13 @@ export function CustomerStatusContent() {
           loadOrders(true);
         },
       });
-      unsubscribes.push(unsubTable);
     }
 
     return () => {
-      unsubscribes.forEach((fn) => fn());
+      unsubscribeOrder?.();
+      unsubscribeTable?.();
     };
-  }, [orders, resolvedTableId, loadOrders]);
+  }, [activeOrderId, resolvedTableId, loadOrders]);
 
   // Back to menu URL preserves table and brand
   const backToMenuUrl = useMemo(() => {
@@ -671,12 +574,11 @@ export function CustomerStatusContent() {
     );
   }
 
-  const activeStep = statusToStep(sessionStatus);
-  const isDone = sessionStatus === 'completed';
-  const isCancelled = orders.length > 0 && orders.every((o) => o.status === 'cancelled');
+  const activeStep = statusToStep(currentOrder.status);
+  const isDone = currentOrder.status === 'completed';
+  const isCancelled = currentOrder.status === 'cancelled';
   const displayTable =
-    orders.find((o) => o.dining_table?.table_number)?.dining_table?.table_number ??
-    (rawTableNumber ? Number(rawTableNumber) : null);
+    currentOrder.dining_table?.table_number ?? (rawTableNumber ? Number(rawTableNumber) : null);
 
   return (
     <div className={['min-h-screen flex flex-col', theme.bg].join(' ')}>
@@ -735,26 +637,22 @@ export function CustomerStatusContent() {
 
       {/* ── Main ─────────────────────────────────────────────────────────── */}
       <main className="flex-1 max-w-lg mx-auto w-full px-5 py-6 flex flex-col gap-7">
+
+
+
         {/* Status headline */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={sessionStatus + orders.length}
+            key={currentOrder.id + currentOrder.status}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22 }}
             className="text-center space-y-1.5"
           >
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <p className={['text-[11px] font-bold uppercase tracking-widest', theme.subtleText].join(' ')}>
-                {orders.length > 1 ? 'Table Session Status' : 'Order Status'}
-              </p>
-              {orders.length > 1 && (
-                <span className={['text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800', theme.accent].join(' ')}>
-                  {orders.length} Active Orders
-                </span>
-              )}
-            </div>
+            <p className={['text-[11px] font-bold uppercase tracking-widest', theme.subtleText].join(' ')}>
+              Order Status
+            </p>
             {isDone && (
               <p className={['text-2xl font-extrabold', theme.text].join(' ')}>
                 Paid &amp; Completed
@@ -766,27 +664,23 @@ export function CustomerStatusContent() {
             {!isDone && !isCancelled && (
               <>
                 <p className={['text-2xl font-extrabold', theme.text].join(' ')}>
-                  {activeStep === 0 && (orders.length > 1 ? 'Orders Sent to Cashier' : 'Sent to Cashier')}
-                  {activeStep === 1 && (orders.length > 1 ? 'Kitchen is Preparing Orders...' : 'Kitchen is Preparing...')}
-                  {activeStep === 2 && (orders.length > 1 ? 'All Orders Ready for Pickup' : 'Ready for Pickup')}
+                  {activeStep === 0 && 'Sent to Cashier'}
+                  {activeStep === 1 && 'Kitchen is Preparing...'}
+                  {activeStep === 2 && 'Ready for Pickup'}
                 </p>
                 {activeStep === 0 && (
                   <p className={['text-sm', theme.subtext].join(' ')}>
-                    Please proceed to the cashier counter to confirm payment for your table session.
+                    Please proceed to the cashier counter to confirm payment.
                   </p>
                 )}
                 {activeStep === 1 && (
                   <p className={['text-sm', theme.subtext].join(' ')}>
-                    {orders.length > 1
-                      ? 'Your food batches are being freshly prepared in the kitchen.'
-                      : 'Your food is being freshly prepared in the kitchen.'}
+                    Your food is being freshly prepared in the kitchen.
                   </p>
                 )}
                 {activeStep === 2 && (
                   <p className={['text-sm', theme.subtext].join(' ')}>
-                    {orders.length > 1
-                      ? 'All items in your table session are ready! Please collect at the counter.'
-                      : 'Your order is ready! Please collect it at the counter.'}
+                    Your order is ready! Please collect it at the counter.
                   </p>
                 )}
               </>
@@ -795,15 +689,15 @@ export function CustomerStatusContent() {
         </AnimatePresence>
 
         {/* Progress bar */}
-        {!isCancelled && <ProgressStepper status={sessionStatus} theme={theme} />}
+        {!isCancelled && <ProgressStepper status={currentOrder.status} theme={theme} />}
 
         {/* Divider */}
         <div className={['w-full h-px', theme.dividerBg].join(' ')} />
 
         {/* Digital receipt */}
         <DigitalReceipt
-          orders={orders}
-          displayTable={displayTable ? String(displayTable).padStart(2, '0') : null}
+          order={currentOrder}
+          tableNumber={rawTableNumber || undefined}
           theme={theme}
         />
 

@@ -1,6 +1,6 @@
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled' | 'Archived' | 'archived';
 export type OrderItemStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
-export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'dine-in' | 'take-out';
+export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
 export type TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning';
 
 export interface Category {
@@ -24,6 +24,7 @@ export interface MenuItem {
   spiciness_level: number;
   created_at: string;
   updated_at: string;
+  brand_schedule?: string | null;
 }
 
 export interface DiningTable {
@@ -62,8 +63,6 @@ export interface Order {
   // Included nested relations
   dining_table?: DiningTable | null;
   order_items?: OrderItem[];
-  items?: OrderItem[];
-  short_id?: string;
 }
 
 export interface CreateOrderItemInput {

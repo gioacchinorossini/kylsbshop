@@ -252,12 +252,5 @@ BEGIN
 END $$;
 
 -- ═══════════════════════════════════════════════════════════════
--- MIGRATION: SUPPORT DINE-IN / TAKE-OUT ORDER TYPE
--- ═══════════════════════════════════════════════════════════════
--- Run this in your Supabase SQL Editor if order_type is constrained to an enum:
-ALTER TABLE public.orders ALTER COLUMN order_type TYPE TEXT;
-ALTER TABLE public.orders ALTER COLUMN order_type SET DEFAULT 'dine-in';
-
--- ═══════════════════════════════════════════════════════════════
 -- ✅ DONE — Your database is fully configured.
 -- ═══════════════════════════════════════════════════════════════
