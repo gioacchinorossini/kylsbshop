@@ -15,7 +15,7 @@ interface CartStore {
   setActiveBrand: (brand: Brand) => void;
   setTodayBrand: (brand: Brand) => void;
   items: CartItem[];
-  addItem: (item: MenuItem) => void;
+  addItem: (item: MenuItem, quantity?: number, specialInstructions?: string) => void;
   updateQuantity: (itemId: string, delta: number) => void;
   updateInstructions: (itemId: string, instructions: string) => void;
   clearCart: () => void;
@@ -33,17 +33,23 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   items: [],
 
-  addItem: (menuItem) =>
+  addItem: (menuItem, quantity = 1, specialInstructions = "") =>
     set((state) => {
       const existing = state.items.find((c) => c.menuItem.id === menuItem.id);
       if (existing) {
         return {
           items: state.items.map((c) =>
-            c.menuItem.id === menuItem.id ? { ...c, quantity: c.quantity + 1 } : c
+            c.menuItem.id === menuItem.id
+              ? {
+                  ...c,
+                  quantity: c.quantity + quantity,
+                  specialInstructions: specialInstructions || c.specialInstructions,
+                }
+              : c
           ),
         };
       }
-      return { items: [...state.items, { menuItem, quantity: 1, specialInstructions: "" }] };
+      return { items: [...state.items, { menuItem, quantity, specialInstructions }] };
     }),
 
   updateQuantity: (itemId, delta) =>

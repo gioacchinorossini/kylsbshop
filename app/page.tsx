@@ -8,275 +8,784 @@ import { twMerge } from "tailwind-merge";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ShoppingCart, Plus, Minus, X, Flame, Leaf, ChevronDown, CheckCircle, ReceiptText, Receipt, Armchair,
+  ChevronLeft, Plus, Minus, X, ShoppingCart, CheckCircle,
+  ReceiptText, LayoutGrid, Rows3
 } from "lucide-react";
-import { Category, MenuItem, Order } from "@/types/database";
-import { getCategoriesAction, getMenuItemsAction } from "@/app/actions/menu";
+import { MenuItem, Order } from "@/types/database";
+import { getMenuItemsAction } from "@/app/actions/menu";
 import { getTablesAction } from "@/app/actions/tables";
-import { createOrderAction, getOrdersByTableAction } from "@/app/actions/orders";
+import { createOrderAction } from "@/app/actions/orders";
 import { useCartStore, Brand } from "@/lib/store/cart";
 
-// ??? Utility ??????????????????????????????????????????????????????????????
 function cn(...inputs: (string | undefined | null | false | 0 | Record<string, boolean>)[]): string {
   return twMerge(clsx(...inputs));
 }
 
-// ??? Dual-Brand Fallback Data ??????????????????????????????????????????????
-const DUAL_BRAND_CATEGORIES: Category[] = [
-  { id: "cat-kyles", name: "Kyle's Eatery (Mon-Sat)", slug: "kyles-eatery", description: "Mon-Sat Schedule", display_order: 1, created_at: "" },
-  { id: "cat-batchoy", name: "Batchoy Shop (Sunday)", slug: "batchoy-shop", description: "Sunday Schedule", display_order: 2, created_at: "" },
+// ─── Dual-Brand Menu Items ──────────────────────────────────────────────────
+const ORIGINAL_MENU: MenuItem[] = [
+  // Kyle's Eatery Items (Mon-Sat)
+  { id: "chori-sandwich", category_id: "cat-kyles", name: "Chori Sandwich", description: "Grilled savory chorizo patty in soft toasted bun with special sauce", price: 199, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+  { id: "backribs", category_id: "cat-kyles", name: "Backribs", description: "Tender slow-cooked pork backribs in savory barbecue glaze served with rice", price: 160, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+  { id: "hungarian", category_id: "cat-kyles", name: "Hungarian", description: "Juicy grilled Hungarian sausage served with garlic rice and egg", price: 120, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 1, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+  { id: "sisig", category_id: "cat-kyles", name: "Sisig", description: "Sizzling crispy seasoned pork sisig topped with chili and calamansi", price: 160, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 1, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+  { id: "palabok", category_id: "cat-kyles", name: "Palabok", description: "Traditional rice noodles with rich savory sauce, chicharon, and egg toppings", price: 50, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+  { id: "tocino", category_id: "cat-kyles", name: "Tocino", description: "Sweet cured caramelized pork tocino served with garlic rice", price: 85, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+  { id: "chicken-ala-king", category_id: "cat-kyles", name: "Chicken Ala King", description: "Creamy chicken ala king with bell peppers and mushrooms over rice", price: 99, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+  { id: "fried-inasal", category_id: "cat-kyles", name: "Fried Inasal", description: "Crispy fried chicken inasal marinated in calamansi and lemongrass", price: 85, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "kyles-eatery", created_at: "", updated_at: "" },
+
+  // Batchoy Shop Items (Sunday)
+  { id: "batchoy-special", category_id: "cat-batchoy", name: "Batchoy Special", description: "Authentic Iloilo noodle soup with pork cracklings, liver, egg, bone marrow broth", price: 150, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "batchoy-shop", created_at: "", updated_at: "" },
+  { id: "caesar-salad", category_id: "cat-batchoy", name: "Caesar Salad", description: "Fresh crisp romaine lettuce, parmesan shavings, croutons, classic dressing", price: 199, image_url: null, is_available: true, is_vegetarian: true, spiciness_level: 0, brand_schedule: "batchoy-shop", created_at: "", updated_at: "" },
+  { id: "chicken-tempura", category_id: "cat-batchoy", name: "Chicken Tempura", description: "Crispy golden Japanese-style battered chicken strips with dip", price: 120, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "batchoy-shop", created_at: "", updated_at: "" },
+  { id: "chorizo-sandwich", category_id: "cat-batchoy", name: "Chorizo Sandwich", description: "Grilled savory garlic chorizo patty in soft toasted bun", price: 95, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "batchoy-shop", created_at: "", updated_at: "" },
+  { id: "egg-fried-rice", category_id: "cat-batchoy", name: "Egg Fried Rice", description: "Fragrant wok-fried rice with fluffy eggs and green onions", price: 45, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "batchoy-shop", created_at: "", updated_at: "" },
+  { id: "ordinary-batchoy", category_id: "cat-batchoy", name: "Ordinary Batchoy", description: "Classic comforting Iloilo miki noodle soup with savory broth and chicharon", price: 100, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, brand_schedule: "batchoy-shop", created_at: "", updated_at: "" },
 ];
 
-const DUAL_BRAND_MENU: MenuItem[] = [
-  { id: "chori-sandwich", category_id: "cat-kyles", name: "Chori Sandwich", description: "Grilled savory chorizo patty in soft toasted bun with special sauce", price: 199, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "backribs", category_id: "cat-kyles", name: "Backribs", description: "Tender slow-cooked pork backribs in savory barbecue glaze served with rice", price: 160, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "hungarian", category_id: "cat-kyles", name: "Hungarian", description: "Juicy grilled Hungarian sausage served with garlic rice and egg", price: 120, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 1, created_at: "", updated_at: "" },
-  { id: "sisig", category_id: "cat-kyles", name: "Sisig", description: "Sizzling crispy seasoned pork sisig topped with chili and calamansi", price: 160, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 1, created_at: "", updated_at: "" },
-  { id: "palabok", category_id: "cat-kyles", name: "Palabok", description: "Traditional rice noodles with rich savory sauce, chicharon, and egg toppings", price: 50, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "tocino", category_id: "cat-kyles", name: "Tocino", description: "Sweet cured caramelized pork tocino served with garlic rice", price: 85, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "chicken-ala-king", category_id: "cat-kyles", name: "Chicken Ala King", description: "Creamy chicken ala king with bell peppers and mushrooms over rice", price: 99, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "fried-inasal", category_id: "cat-kyles", name: "Fried Inasal", description: "Crispy fried chicken inasal marinated in calamansi and lemongrass", price: 85, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "batchoy-special", category_id: "cat-batchoy", name: "Batchoy Special", description: "Authentic Iloilo noodle soup with pork cracklings, liver, egg, bone marrow broth", price: 150, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "ordinary-batchoy", category_id: "cat-batchoy", name: "Ordinary Batchoy", description: "Classic comforting Iloilo miki noodle soup with savory broth and chicharon", price: 100, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "chicken-tempura", category_id: "cat-batchoy", name: "Chicken Tempura", description: "Crispy golden Japanese-style battered chicken strips with dip", price: 120, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "egg-fried-rice", category_id: "cat-batchoy", name: "Egg Fried Rice", description: "Fragrant wok-fried rice with fluffy eggs and green onions", price: 45, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "caesar-salad", category_id: "cat-batchoy", name: "Caesar Salad", description: "Fresh crisp romaine lettuce, parmesan shavings, croutons, classic dressing", price: 199, image_url: null, is_available: true, is_vegetarian: true, spiciness_level: 0, created_at: "", updated_at: "" },
-  { id: "chorizo-sandwich", category_id: "cat-batchoy", name: "Chorizo Sandwich", description: "Grilled savory garlic chorizo patty in soft toasted bun", price: 95, image_url: null, is_available: true, is_vegetarian: false, spiciness_level: 0, created_at: "", updated_at: "" },
+const BASE_PATTERN_NAMES = ["sakura", "seigaiha", "asanoha", "kasuri", "shippo"];
+
+const PLACEHOLDER_IMAGES = [
+  "/images/sushi/salmon_avocado_roll.png",
+  "/images/sushi/california_roll.png",
+  "/images/sushi/dragon_roll.png",
+  "/images/sushi/rainbow_roll.png",
+  "/images/sushi/salmon_roll.png",
 ];
 
-// ??? Theme tokens ??????????????????????????????????????????????????????????
-const THEME = {
-  "kyles-eatery": {
-    bg: "bg-white", surface: "bg-zinc-50",
-    card: "bg-white border border-zinc-100",
-    cardHover: "hover:border-orange-200 hover:shadow-sm",
-    text: "text-zinc-900", subtext: "text-zinc-500",
-    price: "text-orange-500",
-    accent: "bg-orange-500 hover:bg-orange-600 text-white",
-    accentRing: "ring-orange-300",
-    tab: "bg-orange-500 text-white", tabInactive: "text-zinc-500 hover:text-zinc-800",
-    badge: "bg-orange-50 text-orange-600 border border-orange-100",
-    readOnly: "bg-zinc-50 border-b border-zinc-200 text-zinc-600",
-    activeTable: "bg-emerald-50 border-b border-emerald-200 text-emerald-700",
-    dot: "bg-emerald-500",
-    drawer: "bg-white border-t border-zinc-200",
-    drawerSurface: "bg-zinc-50 border border-zinc-100",
-    input: "bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder:text-zinc-400 focus:border-orange-400",
-    successBg: "bg-white border border-emerald-200",
-    brandName: "Kyle's Eatery", brandTagline: "Filipino comfort food, served fresh. (Mon-Sat)",
-    floatBtn: "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-200/80",
-    qty: "bg-zinc-100 hover:bg-zinc-200 text-zinc-700",
-    qtyCount: "text-orange-500 font-mono font-bold",
-    cartFooter: "border-t border-zinc-100 bg-zinc-50",
-    submitBtn: "bg-orange-500 hover:bg-orange-600 text-white",
-    cancelBtn: "bg-zinc-100 hover:bg-zinc-200 text-zinc-700",
-    headerBg: "bg-white/90 border-zinc-100",
-    tableBadge: "bg-zinc-100 text-zinc-800 border-zinc-200",
-  },
+const BATCHOY_ITEM_ORDER = [
+  "batchoy special",
+  "caesar salad",
+  "chicken tempura",
+  "chorizo sandwich",
+  "egg fried rice",
+  "ordinary batchoy",
+];
+
+const KYLES_ITEM_ORDER = [
+  "chori sandwich",
+  "backribs",
+  "hungarian",
+  "sisig",
+  "palabok",
+  "tocino",
+  "chicken ala king",
+  "fried inasal",
+];
+
+// ─── Dual-Brand Theme Configurations ────────────────────────────────────────
+const THEMES = {
   "batchoy-shop": {
-    bg: "bg-zinc-950", surface: "bg-zinc-900",
-    card: "bg-zinc-900 border border-zinc-800",
-    cardHover: "hover:border-red-800",
-    text: "text-white", subtext: "text-zinc-400",
-    price: "text-red-400",
-    accent: "bg-red-600 hover:bg-red-700 text-white",
-    accentRing: "ring-red-700",
-    tab: "bg-red-600 text-white", tabInactive: "text-zinc-500 hover:text-zinc-200",
-    badge: "bg-red-950 text-red-400 border border-red-900",
-    readOnly: "bg-zinc-900 border-b border-zinc-800 text-zinc-400",
-    activeTable: "bg-emerald-950 border-b border-emerald-800 text-emerald-400",
-    dot: "bg-emerald-500",
-    drawer: "bg-zinc-900 border-t border-zinc-800",
-    drawerSurface: "bg-zinc-950 border border-zinc-800",
-    input: "bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:border-red-700",
-    successBg: "bg-zinc-900 border border-emerald-800",
-    brandName: "Batchoy Shop", brandTagline: "Authentic Iloilo batchoy & Sunday specials.",
-    floatBtn: "bg-red-600 hover:bg-red-700 text-white shadow-red-900/60",
-    qty: "bg-zinc-800 hover:bg-zinc-700 text-zinc-200",
-    qtyCount: "text-red-400 font-mono font-bold",
-    cartFooter: "border-t border-zinc-800 bg-zinc-950",
-    submitBtn: "bg-red-600 hover:bg-red-700 text-white",
-    cancelBtn: "bg-zinc-800 hover:bg-zinc-700 text-zinc-300",
-    headerBg: "bg-zinc-950/90 border-zinc-800",
-    tableBadge: "bg-zinc-900 text-zinc-200 border-zinc-700",
+    brandName: "Batchoy Shop",
+    title: "BATCHOY SHOP",
+    bgPattern: "/images/sushi/japanese_pattern.jpg",
+    bgColor: "#560c12",
+    accent: "#8d2d2b",
+    accentHover: "#762423",
+    accentBg: "bg-[#8d2d2b]",
+    accentHoverBg: "hover:bg-[#762423]",
+    accentText: "text-[#8d2d2b]",
+    accentBorder: "border-[#8d2d2b]",
+    accentShadow: "shadow-[#8d2d2b]/30",
+    patternSuffix: "-red",
+  },
+  "kyles-eatery": {
+    brandName: "Kyle's Eatery",
+    title: "KYLE'S EATERY",
+    bgPattern: "/images/sushi/japanese_pattern_orange.jpg",
+    bgColor: "#852d05",
+    accent: "#ea580c",
+    accentHover: "#c2410c",
+    accentBg: "bg-[#ea580c]",
+    accentHoverBg: "hover:bg-[#c2410c]",
+    accentText: "text-[#ea580c]",
+    accentBorder: "border-[#ea580c]",
+    accentShadow: "shadow-[#ea580c]/30",
+    patternSuffix: "-orange",
   },
 } as const;
 
-type Theme = typeof THEME[keyof typeof THEME];
+// ─── SVG Medallion Pattern Definitions (Red & Orange/White) ─────────────────
+function JapanesePatternDefs() {
+  return (
+    <svg width="0" height="0" className="absolute">
+      <defs>
+        {/* ─── RED PATTERNS (Batchoy Shop: #6b0f16 base with #8d2d2b subtle pattern) ─ */}
+        <pattern id="pat-sakura-red" width="32" height="32" patternUnits="userSpaceOnUse">
+          <rect width="32" height="32" fill="#6b0f16" />
+          <circle cx="16" cy="16" r="2.2" fill="#8d2d2b" />
+          <circle cx="16" cy="9.5" r="3.4" fill="#8d2d2b" />
+          <circle cx="22" cy="13.5" r="3.4" fill="#8d2d2b" />
+          <circle cx="20" cy="21" r="3.4" fill="#8d2d2b" />
+          <circle cx="12" cy="21" r="3.4" fill="#8d2d2b" />
+          <circle cx="10" cy="13.5" r="3.4" fill="#8d2d2b" />
+          <circle cx="0" cy="0" r="2" fill="#8d2d2b" />
+          <circle cx="32" cy="0" r="2" fill="#8d2d2b" />
+          <circle cx="0" cy="32" r="2" fill="#8d2d2b" />
+          <circle cx="32" cy="32" r="2" fill="#8d2d2b" />
+        </pattern>
 
-// ??? Menu Card ?????????????????????????????????????????????????????????????
-function MenuCard({
-  item, theme, inCart, qty, isOrderingEnabled, onAdd, onInc, onDec,
+        <pattern id="pat-seigaiha-red" width="40" height="20" patternUnits="userSpaceOnUse">
+          <rect width="40" height="20" fill="#6b0f16" />
+          <circle cx="0" cy="0" r="18" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="0" r="14" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="0" r="10" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="0" r="6" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="0" r="2" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+
+          <circle cx="40" cy="0" r="18" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="0" r="14" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="0" r="10" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="0" r="6" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="0" r="2" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+
+          <circle cx="0" cy="20" r="18" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="20" r="14" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="20" r="10" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="20" r="6" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="0" cy="20" r="2" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+
+          <circle cx="40" cy="20" r="18" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="20" r="14" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="20" r="10" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="20" r="6" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="40" cy="20" r="2" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+
+          <circle cx="20" cy="10" r="18" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="20" cy="10" r="14" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="20" cy="10" r="10" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="20" cy="10" r="6" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="20" cy="10" r="2" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+
+          <circle cx="-20" cy="10" r="18" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="-20" cy="10" r="14" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="60" cy="10" r="18" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+          <circle cx="60" cy="10" r="14" fill="none" stroke="#8d2d2b" strokeWidth="1.8" />
+        </pattern>
+
+        <pattern id="pat-asanoha-red" width="22" height="38.1" patternUnits="userSpaceOnUse">
+          <rect width="22" height="38.1" fill="#6b0f16" />
+          <path
+            d="M 11,0 L 22,19.05 L 11,38.1 L 0,19.05 Z M 0,0 L 11,19.05 L 0,38.1 M 22,0 L 11,19.05 L 22,38.1 M 0,19.05 L 22,19.05 M 11,0 L 11,38.1"
+            stroke="#8d2d2b"
+            strokeWidth="1"
+            fill="none"
+          />
+        </pattern>
+
+        <pattern id="pat-kasuri-red" width="26" height="26" patternUnits="userSpaceOnUse">
+          <rect width="26" height="26" fill="#6b0f16" />
+          <line x1="13" y1="0" x2="13" y2="26" stroke="#8d2d2b" strokeDasharray="3,3" strokeWidth="1" />
+          <circle cx="13" cy="13" r="3.6" fill="#8d2d2b" />
+          <circle cx="0" cy="0" r="2.2" fill="#8d2d2b" />
+          <circle cx="26" cy="26" r="2.2" fill="#8d2d2b" />
+        </pattern>
+
+        <pattern id="pat-shippo-red" width="28" height="28" patternUnits="userSpaceOnUse">
+          <rect width="28" height="28" fill="#6b0f16" />
+          <circle cx="0" cy="0" r="14" stroke="#8d2d2b" strokeWidth="1.1" fill="none" />
+          <circle cx="28" cy="0" r="14" stroke="#8d2d2b" strokeWidth="1.1" fill="none" />
+          <circle cx="0" cy="28" r="14" stroke="#8d2d2b" strokeWidth="1.1" fill="none" />
+          <circle cx="28" cy="28" r="14" stroke="#8d2d2b" strokeWidth="1.1" fill="none" />
+          <circle cx="14" cy="14" r="14" stroke="#8d2d2b" strokeWidth="1.1" fill="none" />
+          <circle cx="14" cy="14" r="1.9" fill="#8d2d2b" />
+        </pattern>
+
+        {/* ─── ORANGE & WHITE PATTERNS (Kyle's Eatery: #ea580c base with light transparent white pattern) ─── */}
+        <pattern id="pat-sakura-orange" width="32" height="32" patternUnits="userSpaceOnUse">
+          <rect width="32" height="32" fill="#ea580c" />
+          <circle cx="16" cy="16" r="2.2" fill="#ffffff" opacity="0.32" />
+          <circle cx="16" cy="9.5" r="3.4" fill="#ffffff" opacity="0.3" />
+          <circle cx="22" cy="13.5" r="3.4" fill="#ffffff" opacity="0.3" />
+          <circle cx="20" cy="21" r="3.4" fill="#ffffff" opacity="0.3" />
+          <circle cx="12" cy="21" r="3.4" fill="#ffffff" opacity="0.3" />
+          <circle cx="10" cy="13.5" r="3.4" fill="#ffffff" opacity="0.3" />
+          <circle cx="0" cy="0" r="2" fill="#ffffff" opacity="0.25" />
+          <circle cx="32" cy="0" r="2" fill="#ffffff" opacity="0.25" />
+          <circle cx="0" cy="32" r="2" fill="#ffffff" opacity="0.25" />
+          <circle cx="32" cy="32" r="2" fill="#ffffff" opacity="0.25" />
+        </pattern>
+
+        <pattern id="pat-seigaiha-orange" width="40" height="20" patternUnits="userSpaceOnUse">
+          <rect width="40" height="20" fill="#ea580c" />
+          <circle cx="0" cy="0" r="18" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="0" r="14" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="0" r="10" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="0" r="6" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="0" r="2" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+
+          <circle cx="40" cy="0" r="18" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="0" r="14" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="0" r="10" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="0" r="6" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="0" r="2" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+
+          <circle cx="0" cy="20" r="18" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="20" r="14" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="20" r="10" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="20" r="6" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="0" cy="20" r="2" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+
+          <circle cx="40" cy="20" r="18" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="20" r="14" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="20" r="10" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="20" r="6" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="40" cy="20" r="2" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+
+          <circle cx="20" cy="10" r="18" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="20" cy="10" r="14" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="20" cy="10" r="10" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="20" cy="10" r="6" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="20" cy="10" r="2" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+
+          <circle cx="-20" cy="10" r="18" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="-20" cy="10" r="14" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="60" cy="10" r="18" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+          <circle cx="60" cy="10" r="14" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.3" />
+        </pattern>
+
+        <pattern id="pat-asanoha-orange" width="22" height="38.1" patternUnits="userSpaceOnUse">
+          <rect width="22" height="38.1" fill="#ea580c" />
+          <path
+            d="M 11,0 L 22,19.05 L 11,38.1 L 0,19.05 Z M 0,0 L 11,19.05 L 0,38.1 M 22,0 L 11,19.05 L 22,38.1 M 0,19.05 L 22,19.05 M 11,0 L 11,38.1"
+            stroke="#ffffff"
+            strokeWidth="1"
+            fill="none"
+            opacity="0.3"
+          />
+        </pattern>
+
+        <pattern id="pat-kasuri-orange" width="26" height="26" patternUnits="userSpaceOnUse">
+          <rect width="26" height="26" fill="#ea580c" />
+          <line x1="13" y1="0" x2="13" y2="26" stroke="#ffffff" strokeDasharray="3,3" strokeWidth="1" opacity="0.3" />
+          <circle cx="13" cy="13" r="3.8" fill="#ffffff" opacity="0.3" />
+          <circle cx="0" cy="0" r="2.4" fill="#ffffff" opacity="0.25" />
+          <circle cx="26" cy="26" r="2.4" fill="#ffffff" opacity="0.25" />
+        </pattern>
+
+        <pattern id="pat-shippo-orange" width="28" height="28" patternUnits="userSpaceOnUse">
+          <rect width="28" height="28" fill="#ea580c" />
+          <circle cx="0" cy="0" r="14" stroke="#ffffff" strokeWidth="1.1" fill="none" opacity="0.3" />
+          <circle cx="28" cy="0" r="14" stroke="#ffffff" strokeWidth="1.1" fill="none" opacity="0.3" />
+          <circle cx="0" cy="28" r="14" stroke="#ffffff" strokeWidth="1.1" fill="none" opacity="0.3" />
+          <circle cx="28" cy="28" r="14" stroke="#ffffff" strokeWidth="1.1" fill="none" opacity="0.3" />
+          <circle cx="14" cy="14" r="14" stroke="#ffffff" strokeWidth="1.1" fill="none" opacity="0.3" />
+          <circle cx="14" cy="14" r="2" fill="#ffffff" opacity="0.32" />
+        </pattern>
+      </defs>
+    </svg>
+  );
+}
+
+function formatPrice(val: number | string): string {
+  const num = Number(val);
+  return `₱${num.toFixed(0)}`;
+}
+
+// ─── Exact List Row Component (Matching user image) ─────────────────────────
+function SushiListRow({
+  item,
+  imageUrl,
+  patternId,
+  theme,
+  qtyInCart,
+  onClick,
+  onAddClick,
 }: {
-  item: MenuItem; theme: Theme; inCart: boolean; qty: number;
-  isOrderingEnabled: boolean; onAdd: () => void; onInc: () => void; onDec: () => void;
+  item: MenuItem;
+  imageUrl: string;
+  patternId: string;
+  theme: typeof THEMES[Brand];
+  qtyInCart: number;
+  onClick: () => void;
+  onAddClick: (e: React.MouseEvent) => void;
 }) {
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
-      className={cn(
-        "rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all duration-200",
-        theme.card, isOrderingEnabled && theme.cardHover
-      )}
+    <div
+      onClick={onClick}
+      className="group relative flex items-center justify-between py-3.5 px-4 cursor-pointer select-none transition-colors hover:bg-stone-50/60 active:bg-stone-100/50"
     >
-      <div className="space-y-1.5">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className={cn("font-semibold text-[15px] leading-snug", theme.text)}>{item.name}</h3>
-          <div className="flex items-center gap-1 shrink-0 mt-0.5">
-            {item.spiciness_level > 0 && <Flame size={13} className="text-orange-400" aria-label="Spicy" />}
-            {item.is_vegetarian && <Leaf size={13} className="text-emerald-500" aria-label="Vegetarian" />}
+      {/* Left: Medallion with Dish Overlap */}
+      <div className="relative flex items-center shrink-0 w-[94px] h-[94px]">
+        {/* Japanese Patterned Circle */}
+        <svg
+          width="82"
+          height="82"
+          viewBox="0 0 82 82"
+          className="rounded-full shadow-inner shrink-0"
+        >
+          <circle cx="41" cy="41" r="41" fill={`url(#${patternId})`} />
+        </svg>
+
+        {/* Food image floating in front, slightly offset to the right and bottom */}
+        <div
+          className="absolute -right-1 top-2 w-[82px] h-[82px] pointer-events-none transition-transform duration-300 group-hover:scale-105"
+          style={{
+            filter: "drop-shadow(4px 7px 12px rgba(0, 0, 0, 0.28))",
+          }}
+        >
+          <Image
+            src={imageUrl}
+            alt={item.name}
+            width={88}
+            height={88}
+            className="w-full h-full object-contain"
+            priority
+          />
+        </div>
+      </div>
+
+      {/* Middle: Name & Price */}
+      <div className="flex-1 min-w-0 pl-4 pr-3 flex flex-col justify-center">
+        {/* Title in soft slate gray matching mockup */}
+        <h3 className="text-[17px] sm:text-[18px] font-medium text-[#4b5563] tracking-tight leading-snug truncate">
+          {item.name}
+        </h3>
+
+        {/* Price in Brand Accent Color */}
+        <span
+          className="text-[18px] sm:text-[19px] font-bold tracking-tight leading-none mt-1 font-sans transition-colors"
+          style={{ color: theme.accent }}
+        >
+          {formatPrice(item.price)}
+        </span>
+      </div>
+
+      {/* Right: Circular Plus (+) Button in Brand Accent */}
+      <div className="flex items-center gap-2 shrink-0 pr-1">
+        {qtyInCart > 0 && (
+          <span
+            className="w-5 h-5 text-white text-[11px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
+            style={{ backgroundColor: theme.accent }}
+          >
+            {qtyInCart}
+          </span>
+        )}
+
+        <button
+          onClick={onAddClick}
+          aria-label={`Add ${item.name} to cart`}
+          className="w-10 h-10 rounded-full border-[2.2px] flex items-center justify-center active:scale-90 transition-all duration-150 shadow-xs"
+          style={{
+            borderColor: theme.accent,
+            color: theme.accent,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = theme.accent;
+            e.currentTarget.style.color = "#ffffff";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = theme.accent;
+          }}
+        >
+          <Plus size={20} strokeWidth={2.8} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Exact Staggered Card View Component (Matching user image) ──────────────
+function SushiCardItem({
+  item,
+  imageUrl,
+  patternId,
+  theme,
+  qtyInCart,
+  onClick,
+  onAddClick,
+}: {
+  item: MenuItem;
+  imageUrl: string;
+  patternId: string;
+  theme: typeof THEMES[Brand];
+  qtyInCart: number;
+  onClick: () => void;
+  onAddClick: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="group relative bg-white rounded-[26px] shadow-[0_12px_28px_-6px_rgba(0,0,0,0.08)] hover:shadow-[0_18px_36px_-6px_rgba(0,0,0,0.12)] border border-stone-100/70 pt-[72px] pb-4 px-3 flex flex-col items-center cursor-pointer select-none transition-all duration-300 active:scale-[0.98]"
+    >
+      {/* Overflowing Japanese Pattern Medallion */}
+      <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-[84px] h-[84px] rounded-full overflow-hidden shadow-xs pointer-events-none transition-transform duration-300 group-hover:scale-105">
+        <svg className="w-full h-full" viewBox="0 0 84 84">
+          <circle cx="42" cy="42" r="42" fill={`url(#${patternId})`} />
+        </svg>
+      </div>
+
+      {/* Overflowing Food Cutout Image with Realistic Drop Shadow */}
+      <div
+        className="absolute -top-4 left-1/2 -translate-x-1/2 w-[80px] h-[80px] pointer-events-none transition-transform duration-300 group-hover:scale-110 flex items-center justify-center"
+        style={{
+          filter: "drop-shadow(4px 10px 10px rgba(0, 0, 0, 0.32))",
+        }}
+      >
+        <Image
+          src={imageUrl}
+          alt={item.name}
+          width={84}
+          height={84}
+          className="w-full h-full object-contain"
+          priority
+        />
+      </div>
+
+      {/* Cart quantity badge if already in cart */}
+      {qtyInCart > 0 && (
+        <span
+          className="absolute top-2 right-2 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
+          style={{ backgroundColor: theme.accent }}
+        >
+          {qtyInCart}
+        </span>
+      )}
+
+      {/* Item Title */}
+      <h3 className="text-[13px] sm:text-[14px] font-medium text-[#374151] text-center truncate w-full px-1 mt-1 leading-snug">
+        {item.name}
+      </h3>
+
+      {/* Item Price */}
+      <p
+        className="text-[14px] sm:text-[15px] font-bold text-center mt-0.5 tracking-tight font-sans transition-colors"
+        style={{ color: theme.accent }}
+      >
+        {formatPrice(item.price)}
+      </p>
+
+      {/* Circular Plus (+) Button matching mockup */}
+      <button
+        onClick={onAddClick}
+        aria-label={`Add ${item.name} to cart`}
+        className="w-9 h-9 rounded-full border-[2.2px] flex items-center justify-center mt-2.5 mb-0.5 transition-all duration-150 active:scale-90 hover:scale-105 shadow-xs"
+        style={{
+          borderColor: theme.accent,
+          color: theme.accent,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = theme.accent;
+          e.currentTarget.style.color = "#ffffff";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+          e.currentTarget.style.color = theme.accent;
+        }}
+      >
+        <Plus size={18} strokeWidth={2.6} />
+      </button>
+    </div>
+  );
+}
+
+// ─── Item Detail / Add-to-Cart Modal (Exact bottom mockups) ───────────────────
+function ItemDetailModal({
+  item,
+  imageUrl,
+  patternId,
+  theme,
+  initialQty = 1,
+  onClose,
+  onAddToCart,
+}: {
+  item: MenuItem;
+  imageUrl: string;
+  patternId: string;
+  theme: typeof THEMES[Brand];
+  initialQty?: number;
+  onClose: () => void;
+  onAddToCart: (item: MenuItem, qty: number, instructions: string) => void;
+}) {
+  const [qty, setQty] = useState(initialQty > 0 ? initialQty : 1);
+  const [instructions, setInstructions] = useState("");
+
+  const handleDec = () => {
+    if (qty > 1) setQty(qty - 1);
+  };
+
+  const handleInc = () => {
+    setQty(qty + 1);
+  };
+
+  const handleSubmit = () => {
+    onAddToCart(item, qty, instructions);
+    onClose();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ y: "100%", opacity: 0.5 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: "100%", opacity: 0 }}
+        transition={{ type: "spring", damping: 28, stiffness: 300 }}
+        className="w-full sm:max-w-sm bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl relative flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-stone-700 flex items-center justify-center shadow-md backdrop-blur-sm transition-transform active:scale-90"
+        >
+          <X size={18} strokeWidth={2.2} />
+        </button>
+
+        {/* Top Japanese Arch Graphic with Dish Image */}
+        <div className="relative pt-6 pb-2 px-6 flex flex-col items-center justify-center">
+          {/* Circular/Arch patterned backdrop */}
+          <div className="relative w-44 h-44 rounded-full overflow-hidden shadow-lg border-2 border-stone-200/50 flex items-center justify-center">
+            <svg width="176" height="176" viewBox="0 0 176 176" className="w-full h-full">
+              <circle cx="88" cy="88" r="88" fill={`url(#${patternId})`} />
+            </svg>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20" />
+          </div>
+
+          {/* Food image floating directly above arch */}
+          <div
+            className="absolute top-8 w-36 h-36 flex items-center justify-center pointer-events-none"
+            style={{
+              filter: "drop-shadow(4px 8px 16px rgba(0, 0, 0, 0.32))",
+            }}
+          >
+            <Image
+              src={imageUrl}
+              alt={item.name}
+              width={160}
+              height={160}
+              className="w-36 h-36 object-contain"
+              priority
+            />
           </div>
         </div>
-        <p className={cn("text-xs leading-relaxed line-clamp-2", theme.subtext)}>{item.description}</p>
-      </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <span className={cn("text-lg font-bold font-mono tracking-tight", theme.price)}>
-          ₱{Number(item.price).toFixed(0)}
-        </span>
+        {/* Content Section */}
+        <div className="px-6 pt-3 pb-8 flex flex-col items-center text-center space-y-4">
+          <div>
+            <h3 className="text-xl font-bold text-stone-900 tracking-tight">
+              {item.name}
+            </h3>
+            <p className="text-sm font-semibold text-stone-500 mt-0.5 font-mono">
+              {formatPrice(item.price)}
+            </p>
+            {item.description && (
+              <p className="text-xs text-stone-500 mt-2 max-w-[280px] leading-relaxed line-clamp-2">
+                {item.description}
+              </p>
+            )}
+          </div>
 
-        {isOrderingEnabled && (
-          inCart ? (
-            <div className="flex items-center gap-2">
-              <motion.button whileTap={{ scale: 0.88 }} onClick={onDec}
-                className={cn("w-7 h-7 rounded-full flex items-center justify-center transition", theme.qty)}>
-                <Minus size={12} />
-              </motion.button>
-              <motion.span key={qty} initial={{ scale: 1.3 }} animate={{ scale: 1 }}
-                transition={{ duration: 0.15 }} className={cn("w-5 text-center text-sm", theme.qtyCount)}>
+          {/* Quantity Controls: [-] [ 1 ] [+] */}
+          <div className="flex items-center justify-center gap-4 pt-1">
+            <button
+              onClick={handleDec}
+              aria-label="Decrease quantity"
+              className="w-10 h-10 rounded-full border border-stone-300 text-stone-700 flex items-center justify-center hover:bg-stone-100 hover:border-stone-400 active:scale-90 transition-all shadow-sm"
+            >
+              <Minus size={18} strokeWidth={2} />
+            </button>
+
+            <div className="w-24 h-11 border border-stone-300 rounded-xl flex items-center justify-center bg-stone-50/50 shadow-inner">
+              <span className="text-lg font-bold font-mono text-stone-900">
                 {qty}
-              </motion.span>
-              <motion.button whileTap={{ scale: 0.88 }} onClick={onInc}
-                className={cn("w-7 h-7 rounded-full flex items-center justify-center transition", theme.qty)}>
-                <Plus size={12} />
-              </motion.button>
+              </span>
             </div>
-          ) : (
-            <motion.button whileTap={{ scale: 0.93 }} onClick={onAdd}
-              className={cn("flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition", theme.accent)}>
-              <Plus size={12} />Add
-            </motion.button>
-          )
-        )}
-      </div>
+
+            <button
+              onClick={handleInc}
+              aria-label="Increase quantity"
+              className="w-10 h-10 rounded-full border border-stone-300 text-stone-700 flex items-center justify-center hover:bg-stone-100 hover:border-stone-400 active:scale-90 transition-all shadow-sm"
+            >
+              <Plus size={18} strokeWidth={2} />
+            </button>
+          </div>
+
+          {/* Optional Special Instructions */}
+          <div className="w-full pt-1">
+            <input
+              type="text"
+              placeholder="Add special instructions..."
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              className="w-full text-xs bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-stone-800 placeholder:text-stone-400 focus:outline-none transition-colors"
+              style={{ borderColor: theme.accent }}
+            />
+          </div>
+
+          {/* Large Pill Add to Cart Button (Themed) */}
+          <button
+            onClick={handleSubmit}
+            className="w-full py-3.5 px-6 rounded-full text-white font-medium text-sm sm:text-base tracking-wide shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            style={{ backgroundColor: theme.accent }}
+          >
+            <span>Add to Cart</span>
+            <span className="opacity-80 font-mono text-xs">
+              • {formatPrice(Number(item.price) * qty)}
+            </span>
+          </button>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
 
-// ─── Cart Drawer ──────────────────────────────────────────────────────────────
+// ─── Cart Drawer ─────────────────────────────────────────────────────────────
 function CartDrawer({
-  theme, rawTableNumber,
-  onSubmit, isPending, errorMessage, onClose,
+  tableNumber,
+  theme,
+  onSubmit,
+  isPending,
+  errorMessage,
+  onClose,
 }: {
-  theme: Theme; rawTableNumber: string;
-  onSubmit: () => void; isPending: boolean; errorMessage: string | null; onClose: () => void;
+  tableNumber: string;
+  theme: typeof THEMES[Brand];
+  onSubmit: () => void;
+  isPending: boolean;
+  errorMessage: string | null;
+  onClose: () => void;
 }) {
   const { items, updateQuantity, updateInstructions, totalCount, subtotal } = useCartStore();
 
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
-        initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-        transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
-        className={cn(
-          "w-full sm:max-w-md flex flex-col rounded-t-3xl sm:rounded-3xl overflow-hidden",
-          "max-h-[90dvh]",
-          theme.drawer
-        )}
+        initial={{ y: "100%", opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: "100%", opacity: 0 }}
+        transition={{ type: "spring", damping: 28, stiffness: 300 }}
+        className="w-full sm:max-w-md flex flex-col bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl max-h-[90dvh]"
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Fixed Header */}
-        <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-4 border-b border-inherit">
+        {/* Header */}
+        <div className="shrink-0 flex items-center justify-between px-6 pt-5 pb-4 border-b border-stone-100">
           <div>
-            <h2 className={cn("text-base font-bold flex items-center gap-2", theme.text)}>
-              <ShoppingCart size={16} />Your Order
-              {rawTableNumber && (
-                <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", theme.badge)}>
-                  Table {rawTableNumber}
+            <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
+              <ShoppingCart size={18} style={{ color: theme.accent }} />
+              Your Order
+              {tableNumber && (
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200">
+                  Table {tableNumber}
                 </span>
               )}
             </h2>
-            <p className={cn("text-xs mt-0.5", theme.subtext)}>
-              {totalCount()} item{totalCount() !== 1 ? "s" : ""} · ₱{subtotal().toFixed(2)}
+            <p className="text-xs text-stone-400 mt-0.5">
+              {totalCount()} item{totalCount() !== 1 ? "s" : ""} · {formatPrice(subtotal())}
             </p>
           </div>
-          <button onClick={onClose}
-            className={cn("w-8 h-8 rounded-full flex items-center justify-center transition", theme.qty)}>
-            <X size={14} />
+          <button
+            onClick={onClose}
+            aria-label="Close cart"
+            className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition"
+          >
+            <X size={15} />
           </button>
         </div>
 
         {/* Scrollable Items */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
           <AnimatePresence initial={false}>
             {items.map((c) => (
-              <motion.div key={c.menuItem.id} layout
-                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
-                className={cn("rounded-xl p-3.5 space-y-2.5", theme.drawerSurface)}
+              <motion.div
+                key={c.menuItem.id}
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="rounded-2xl p-3.5 bg-stone-50 border border-stone-100 space-y-2.5"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className={cn("text-sm font-semibold truncate", theme.text)}>{c.menuItem.name}</p>
-                    <p className={cn("text-xs font-mono", theme.price)}>
-                      ₱{(Number(c.menuItem.price) * c.quantity).toFixed(2)}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-800 truncate">
+                      {c.menuItem.name}
+                    </p>
+                    <p
+                      className="text-xs font-mono font-medium"
+                      style={{ color: theme.accent }}
+                    >
+                      {formatPrice(Number(c.menuItem.price) * c.quantity)}
                     </p>
                   </div>
+
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => updateQuantity(c.menuItem.id, -1)}
-                      className={cn("w-7 h-7 rounded-full flex items-center justify-center transition", theme.qty)}>
-                      <Minus size={11} />
+                    <button
+                      onClick={() => updateQuantity(c.menuItem.id, -1)}
+                      className="w-7 h-7 rounded-full bg-white border border-stone-200 hover:bg-stone-100 flex items-center justify-center text-stone-700 transition"
+                    >
+                      <Minus size={12} />
                     </button>
-                    <span className={cn("w-5 text-center text-sm", theme.qtyCount)}>{c.quantity}</span>
-                    <button onClick={() => updateQuantity(c.menuItem.id, 1)}
-                      className={cn("w-7 h-7 rounded-full flex items-center justify-center transition", theme.qty)}>
-                      <Plus size={11} />
+                    <span className="w-5 text-center text-sm font-bold font-mono text-stone-800">
+                      {c.quantity}
+                    </span>
+                    <button
+                      onClick={() => updateQuantity(c.menuItem.id, 1)}
+                      className="w-7 h-7 rounded-full bg-white border border-stone-200 hover:bg-stone-100 flex items-center justify-center text-stone-700 transition"
+                    >
+                      <Plus size={12} />
                     </button>
                   </div>
                 </div>
-                <input type="text" placeholder="Special instructions..."
+
+                <input
+                  type="text"
+                  placeholder="Special instructions..."
                   value={c.specialInstructions}
                   onChange={(e) => updateInstructions(c.menuItem.id, e.target.value)}
-                  className={cn("w-full text-xs rounded-lg px-3 py-2 outline-none transition", theme.input)}
+                  className="w-full text-xs bg-white border border-stone-200 rounded-lg px-3 py-2 outline-none text-stone-800 placeholder:text-stone-400 transition"
+                  style={{ borderColor: theme.accent }}
                 />
               </motion.div>
             ))}
           </AnimatePresence>
 
           {items.length === 0 && (
-            <div className={cn("py-16 text-center text-sm", theme.subtext)}>
-              Your cart is empty.<br />Add items from the menu.
+            <div className="py-16 text-center text-sm text-stone-400">
+              Your cart is empty.<br />Select items from the menu to get started.
             </div>
           )}
         </div>
 
         {/* Sticky Footer */}
         {items.length > 0 && (
-          <div className={cn("shrink-0 px-5 pt-4 pb-8 safe-bottom", theme.cartFooter)}>
+          <div className="shrink-0 px-6 pt-4 pb-8 bg-stone-50 border-t border-stone-100">
             {errorMessage && (
-              <p className="mb-3 text-xs text-red-500 bg-red-50 dark:bg-red-950 rounded-xl px-3 py-2 border border-red-200 dark:border-red-900">
+              <p className="mb-3 text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2 border border-red-200">
                 {errorMessage}
               </p>
             )}
-            <div className={cn("flex justify-between items-baseline mb-4", theme.text)}>
-              <span className="text-sm font-medium">Total</span>
-              <span className={cn("text-2xl font-bold font-mono tracking-tight", theme.price)}>
-                ₱{subtotal().toFixed(2)}
+            <div className="flex justify-between items-baseline mb-4 text-stone-900">
+              <span className="text-sm font-medium text-stone-500">Subtotal</span>
+              <span
+                className="text-2xl font-bold font-mono tracking-tight"
+                style={{ color: theme.accent }}
+              >
+                {formatPrice(subtotal())}
               </span>
             </div>
-            <motion.button whileTap={{ scale: 0.97 }} onClick={onSubmit} disabled={isPending}
-              className={cn("w-full py-3.5 rounded-2xl text-sm font-bold transition disabled:opacity-50", theme.submitBtn)}>
-              {isPending ? "Sending to Cashier..." : "Place Order →"}
-            </motion.button>
+            <button
+              onClick={onSubmit}
+              disabled={isPending}
+              className="w-full py-3.5 rounded-full text-white font-bold text-sm tracking-wide shadow-lg transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ backgroundColor: theme.accent }}
+            >
+              {isPending ? "Sending to Kitchen..." : "Place Order →"}
+            </button>
           </div>
         )}
       </motion.div>
@@ -284,159 +793,94 @@ function CartDrawer({
   );
 }
 
-// ─── Success Modal ─────────────────────────────────────────────────────────
-function SuccessModal({
-  order, theme, brand = "kyles-eatery", rawTableNumber, onClose,
+// ─── Order Success Modal ─────────────────────────────────────────────────────
+function OrderSuccessModal({
+  order,
+  tableNumber,
+  theme,
+  onClose,
 }: {
-  order: Order; theme: Theme; brand?: string; rawTableNumber: string; onClose: () => void;
+  order: Order;
+  tableNumber: string;
+  theme: typeof THEMES[Brand];
+  onClose: () => void;
 }) {
-  const [receiptOpen, setReceiptOpen] = useState(false);
-  const items = order.order_items ?? [];
-
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
     >
       <motion.div
-        initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className={cn("w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl", theme.successBg)}
+        className="w-full max-w-sm rounded-[32px] bg-white overflow-hidden shadow-2xl p-7 text-center space-y-4"
       >
-        {/* Top section */}
-        <div className="p-8 text-center space-y-5">
-          {/* Check icon */}
-          <motion.div
-            initial={{ scale: 0 }} animate={{ scale: 1 }}
-            transition={{ delay: 0.1, type: "spring", stiffness: 300 }}
-            className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-200 dark:border-emerald-800"
+        <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
+          <CheckCircle size={28} />
+        </div>
+
+        <div>
+          <h3 className="text-xl font-bold text-stone-900">Order Received!</h3>
+          <p className="text-xs text-stone-500 mt-1">Your order has been sent to the kitchen.</p>
+        </div>
+
+        <div className="rounded-2xl bg-stone-50 border border-stone-100 p-4 space-y-1">
+          <p className="text-xs text-stone-400">Order Number</p>
+          <p
+            className="text-2xl font-bold font-mono tracking-wider"
+            style={{ color: theme.accent }}
           >
-            <CheckCircle size={28} />
-          </motion.div>
+            #{order.order_number}
+          </p>
+          <p className="text-sm font-semibold font-mono text-stone-700">
+            {formatPrice(order.total_amount)}
+          </p>
+        </div>
 
-          {/* Title */}
-          <div>
-            <h3 className={cn("text-xl font-bold", theme.text)}>Order Received!</h3>
-            <p className={cn("text-xs mt-1", theme.subtext)}>Your order has been sent to the cashier.</p>
-          </div>
-
-          {/* Order number + total */}
-          <div className={cn("rounded-2xl p-4 space-y-0.5", theme.surface)}>
-            <p className={cn("text-xs", theme.subtext)}>Order Number</p>
-            <p className={cn("text-2xl font-bold font-mono tracking-wider", theme.price)}>
-              #{order.order_number}
-            </p>
-            <p className={cn("text-base font-semibold font-mono", theme.text)}>
-              ₱{Number(order.total_amount).toFixed(2)}
+        {tableNumber && (
+          <div className="rounded-xl bg-amber-50/70 border border-amber-200/60 px-4 py-2.5 text-center">
+            <p className="text-xs text-amber-800">
+              Assigned to <span className="font-bold">Table {tableNumber}</span>
             </p>
           </div>
+        )}
 
-          {/* Cashier instruction */}
-          <div className="rounded-2xl border border-dashed border-amber-400 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-center">
-            <p className="text-[13px] font-medium text-amber-800 dark:text-amber-300 leading-snug">
-              Please state{rawTableNumber ? ` Table ${rawTableNumber} and` : ""}{" "}
-              Order <span className="font-bold">#{order.order_number}</span> at the
-              cashier counter when paying.
-            </p>
-          </div>
-
-          {/* Receipt accordion toggle */}
-          {items.length > 0 && (
-            <button
-              onClick={() => setReceiptOpen((o) => !o)}
-              className={cn(
-                "w-full flex items-center justify-between text-xs font-semibold px-3 py-2 rounded-xl transition",
-                theme.qty
-              )}
-            >
-              <span>{receiptOpen ? "Hide" : "View"} itemized receipt</span>
-              <motion.span
-                animate={{ rotate: receiptOpen ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <ChevronDown size={14} />
-              </motion.span>
-            </button>
-          )}
-
-          {/* Accordion receipt body */}
-          <AnimatePresence initial={false}>
-            {receiptOpen && items.length > 0 && (
-              <motion.div
-                key="receipt"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.22 }}
-                className="overflow-hidden"
-              >
-                <div className={cn("rounded-2xl divide-y text-left", theme.drawerSurface)}>
-                  {items.map((item, i) => (
-                    <div key={item.id ?? i} className="flex items-baseline justify-between gap-2 px-3.5 py-2.5">
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-xs font-semibold truncate", theme.text)}>
-                          {item.quantity}× {item.menu_item_name}
-                        </p>
-                        {item.special_instructions && (
-                          <p className={cn("text-[10px] italic truncate mt-0.5", theme.subtext)}>
-                            {item.special_instructions}
-                          </p>
-                        )}
-                      </div>
-                      <p className={cn("text-xs font-mono shrink-0", theme.price)}>
-                        ₱{Number(item.subtotal).toFixed(2)}
-                      </p>
-                    </div>
-                  ))}
-                  <div className={cn("flex justify-between items-center px-3.5 py-2.5", theme.text)}>
-                    <span className="text-xs font-bold">Total</span>
-                    <span className={cn("text-sm font-bold font-mono", theme.price)}>
-                      ₱{Number(order.total_amount).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* CTA Buttons */}
-          <div className="space-y-2.5 pt-1">
-            <Link
-              href={`/status?order=${order.id}&brand=${brand}${rawTableNumber ? `&table=${encodeURIComponent(rawTableNumber)}` : ""}`}
-              className={cn(
-                "w-full py-3.5 rounded-2xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm",
-                theme.submitBtn
-              )}
-            >
-              <ReceiptText size={16} />
-              Track My Order
-            </Link>
-
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={onClose}
-              className={cn("w-full py-3 rounded-2xl text-sm font-semibold transition", theme.cancelBtn)}
-            >
-              Order More
-            </motion.button>
-          </div>
+        {/* CTA Buttons */}
+        <div className="space-y-2.5 pt-2">
+          <Link
+            href={`/status?order=${order.id}${tableNumber ? `&table=${encodeURIComponent(tableNumber)}` : ""}`}
+            className="w-full py-3.5 rounded-full text-white text-sm font-semibold transition flex items-center justify-center gap-2 shadow-md"
+            style={{ backgroundColor: theme.accent }}
+          >
+            <ReceiptText size={16} />
+            Track Order Status
+          </Link>
+          <button
+            onClick={onClose}
+            className="w-full py-3 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition"
+          >
+            Order More
+          </button>
         </div>
       </motion.div>
     </motion.div>
   );
 }
 
-// ??? Root Page ???????????????????????????????????????????????????????????????
-export default function CustomerHomePage() {
+// ─── Main Customer Order Page ────────────────────────────────────────────────
+export default function CustomerOrderPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-white flex items-center justify-center">
-          <motion.div animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
-            className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full"
+        <div className="min-h-screen bg-[#560c12] flex items-center justify-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+            className="w-8 h-8 border-2 border-white/60 border-t-transparent rounded-full"
           />
         </div>
       }
@@ -446,68 +890,110 @@ export default function CustomerHomePage() {
   );
 }
 
-// ─── Main Content Component ───────────────────────────────────────────────────
 function CustomerMenuContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const tableParam = searchParams.get("table");
-  const isOrderingEnabled = Boolean(tableParam && tableParam.trim().length > 0);
   const rawTableNumber = tableParam ? tableParam.replace(/^table\s*/i, "").trim() : "";
 
   const brandParam = searchParams.get("brand");
   const dayOfWeek = new Date().getDay();
+  // Sunday = Batchoy Shop (Red); Mon-Sat = Kyle's Eatery (Orange & White)
   const systemBrand: Brand = dayOfWeek === 0 ? "batchoy-shop" : "kyles-eatery";
-  const effectiveBrand: Brand =
+  const initialBrand: Brand =
     brandParam === "batchoy-shop" || brandParam === "kyles-eatery"
       ? brandParam
       : systemBrand;
 
-  const {
-    setActiveBrand, setTodayBrand,
-    isCartOpen, setCartOpen, items: cartItems, addItem, updateQuantity, clearCart,
-    totalCount, subtotal,
-  } = useCartStore();
+  const [currentBrand, setCurrentBrand] = useState<Brand>(initialBrand);
+  const theme = THEMES[currentBrand];
 
-  const theme = THEME[effectiveBrand];
-
-  const [categories, setCategories] = useState<Category[]>(DUAL_BRAND_CATEGORIES);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(DUAL_BRAND_MENU);
-  const [selectedTableId, setSelectedTableId] = useState<string>("");
-  const [isPending, startTransition] = useTransition();
-  const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
-  const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
-  const [hasActiveOrder, setHasActiveOrder] = useState<boolean>(false);
-  const [hasActiveOrders, setHasActiveOrders] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Client-side check for active orders from @kyle_pos_my_orders
+  // Sync brand with Settings stored in localStorage & listen for admin changes
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem("@kyle_pos_my_orders");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setHasActiveOrders(true);
-          return;
+    if (brandParam === "batchoy-shop" || brandParam === "kyles-eatery") {
+      setCurrentBrand(brandParam);
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const savedBrand = localStorage.getItem("kyles_active_brand");
+      if (savedBrand === "batchoy-shop" || savedBrand === "kyles-eatery") {
+        setCurrentBrand(savedBrand);
+      } else {
+        setCurrentBrand(systemBrand);
+      }
+    }
+  }, [brandParam, systemBrand]);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "kyles_active_brand") {
+        if (brandParam === "batchoy-shop" || brandParam === "kyles-eatery") return;
+        const newBrand = e.newValue;
+        if (newBrand === "batchoy-shop" || newBrand === "kyles-eatery") {
+          setCurrentBrand(newBrand);
+        } else {
+          setCurrentBrand(systemBrand);
         }
       }
-      setHasActiveOrders(false);
-    } catch {
-      setHasActiveOrders(false);
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [brandParam, systemBrand]);
+
+  // View mode: 'cards' (staggered 2-column masonry matching mockup) or 'list'
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedMode = localStorage.getItem("kyles_view_mode");
+      if (savedMode === "list" || savedMode === "cards") {
+        setViewMode(savedMode);
+      }
     }
   }, []);
 
-  useEffect(() => {
-    setActiveBrand(effectiveBrand);
-    setTodayBrand(systemBrand);
+  const handleSetViewMode = (mode: "cards" | "list") => {
+    setViewMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("kyles_view_mode", mode);
+    }
+  };
 
+  const {
+    setActiveBrand, setTodayBrand,
+    isCartOpen, setCartOpen, items: cartItems, addItem, clearCart,
+    totalCount, subtotal,
+  } = useCartStore();
+
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(ORIGINAL_MENU);
+  const [selectedTableId, setSelectedTableId] = useState<string>("");
+
+  // Selected item for Add-to-Cart Modal
+  const [modalItem, setModalItem] = useState<{ item: MenuItem; imageUrl: string; patternId: string } | null>(null);
+
+  const [isPending, startTransition] = useTransition();
+  const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasActiveOrders, setHasActiveOrders] = useState<boolean>(false);
+
+  // Sync brand with Zustand store
+  useEffect(() => {
+    setActiveBrand(currentBrand);
+    setTodayBrand(systemBrand);
+  }, [currentBrand, systemBrand, setActiveBrand, setTodayBrand]);
+
+  // Load backend items and table
+  useEffect(() => {
     async function loadData() {
-      const [catRes, itemRes, tableRes] = await Promise.all([
-        getCategoriesAction(), getMenuItemsAction(), getTablesAction(),
+      const [itemRes, tableRes] = await Promise.all([
+        getMenuItemsAction(),
+        getTablesAction(),
       ]);
-      if (catRes.success && catRes.data && catRes.data.length > 0) setCategories(catRes.data);
-      if (itemRes.success && itemRes.data && itemRes.data.length > 0) setMenuItems(itemRes.data);
+
+      if (itemRes.success && itemRes.data && itemRes.data.length > 0) {
+        setMenuItems(itemRes.data);
+      }
+
       if (tableRes.success && tableRes.data && tableRes.data.length > 0) {
         if (rawTableNumber) {
           const matched = tableRes.data.find(
@@ -520,63 +1006,65 @@ function CustomerMenuContent() {
       }
     }
     loadData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawTableNumber, tableParam, effectiveBrand]);
+  }, [rawTableNumber, tableParam]);
 
-  // Save table number to localStorage whenever detected
+  // Check active orders in localStorage
   useEffect(() => {
-    if (rawTableNumber && typeof window !== "undefined") {
-      try {
-        localStorage.setItem("kyles_current_table", rawTableNumber);
-      } catch {}
-    }
-  }, [rawTableNumber]);
-
-  // Check if this table or session has active orders to show notification indicator
-  useEffect(() => {
-    async function checkTableOrders() {
-      const tableToCheck =
-        rawTableNumber ||
-        (typeof window !== "undefined" ? localStorage.getItem("kyles_current_table") || "" : "");
-
-      if (tableToCheck) {
-        const res = await getOrdersByTableAction(tableToCheck);
-        if (res.success && res.data && res.data.length > 0) {
-          const active = res.data.some((o) =>
-            ["pending", "preparing", "ready"].includes(o.status)
-          );
-          if (active) setHasActiveOrder(true);
-          setLastPlacedOrder(res.data[0]);
-          return;
-        }
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("@kyle_pos_my_orders");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) setHasActiveOrders(true);
       }
+    } catch {}
+  }, []);
 
-      if (typeof window !== "undefined") {
-        const storedId = localStorage.getItem("kyles_last_order_id");
-        if (storedId) {
-          setHasActiveOrder(true);
-        }
-      }
+  // Filter items by brand
+  const filteredItems = menuItems.filter((i) => {
+    const nameLower = i.name.trim().toLowerCase();
+    if (currentBrand === "batchoy-shop") {
+      if (i.brand_schedule === "batchoy-shop") return true;
+      if (i.category_id === "cat-batchoy" || i.category_id === "1f0a6358-1f78-49ea-b8ce-4c6dcbf84548") return true;
+      return BATCHOY_ITEM_ORDER.includes(nameLower);
+    } else {
+      if (i.brand_schedule === "kyles-eatery") return true;
+      if (i.category_id === "cat-kyles" || i.category_id === "41fb8b16-c957-4776-a310-adbc11a650a9") return true;
+      return KYLES_ITEM_ORDER.includes(nameLower);
     }
-    checkTableOrders();
-  }, [rawTableNumber]);
+  });
 
-  const kylesCatId = categories.find((c) => c.slug === "kyles-eatery")?.id || "cat-kyles";
-  const batchoyCatId = categories.find((c) => c.slug === "batchoy-shop")?.id || "cat-batchoy";
+  // Sort items in the exact canonical order requested for each brand
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    const nameA = a.name.trim().toLowerCase();
+    const nameB = b.name.trim().toLowerCase();
+    if (currentBrand === "batchoy-shop") {
+      const idxA = BATCHOY_ITEM_ORDER.indexOf(nameA);
+      const idxB = BATCHOY_ITEM_ORDER.indexOf(nameB);
+      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+    } else {
+      const idxA = KYLES_ITEM_ORDER.indexOf(nameA);
+      const idxB = KYLES_ITEM_ORDER.indexOf(nameB);
+      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+    }
+  });
 
-  const filteredItems = menuItems.filter((i) =>
-    effectiveBrand === "kyles-eatery"
-      ? i.category_id === kylesCatId || i.category_id === "cat-kyles"
-      : i.category_id === batchoyCatId || i.category_id === "cat-batchoy"
-  );
+  const itemsToRender =
+    sortedItems.length > 0
+      ? sortedItems
+      : ORIGINAL_MENU.filter((i) =>
+          currentBrand === "batchoy-shop"
+            ? i.brand_schedule === "batchoy-shop"
+            : i.brand_schedule === "kyles-eatery"
+        );
 
   const handlePlaceOrder = () => {
-    if (!isOrderingEnabled || cartItems.length === 0) return;
+    if (cartItems.length === 0) return;
     setErrorMessage(null);
     startTransition(async () => {
       const payload = {
         table_id: selectedTableId || undefined,
-        customer_name: rawTableNumber ? "Table " + rawTableNumber + " Guest" : "Kiosk Guest",
+        customer_name: rawTableNumber ? "Table " + rawTableNumber + " Guest" : "Guest",
         customer_notes: rawTableNumber ? "Table " + rawTableNumber : "",
         items: cartItems.map((c) => ({
           menu_item_id: c.menuItem.id,
@@ -584,206 +1072,314 @@ function CustomerMenuContent() {
           special_instructions: c.specialInstructions,
         })),
       };
+
       const result = await createOrderAction(payload);
       if (result.success && result.data) {
-        const placedOrder = result.data;
-        setLastPlacedOrder(placedOrder);
-        setHasActiveOrder(true);
+        const placed = result.data;
         if (typeof window !== "undefined") {
           try {
-            localStorage.setItem("kyles_last_order_id", placedOrder.id);
+            localStorage.setItem("kyles_last_order_id", placed.id);
             if (rawTableNumber) {
-              localStorage.setItem(`kyles_table_${rawTableNumber}_last_order`, placedOrder.id);
+              localStorage.setItem(`kyles_table_${rawTableNumber}_last_order`, placed.id);
             }
             const rawMyOrders = localStorage.getItem("@kyle_pos_my_orders");
             const parsedMyOrders = rawMyOrders ? JSON.parse(rawMyOrders) : [];
             const updatedMyOrders = Array.isArray(parsedMyOrders)
-              ? [...parsedMyOrders, placedOrder.id]
-              : [placedOrder.id];
+              ? [...parsedMyOrders, placed.id]
+              : [placed.id];
             localStorage.setItem("@kyle_pos_my_orders", JSON.stringify(updatedMyOrders));
             setHasActiveOrders(true);
           } catch {}
         }
         clearCart();
         setCartOpen(false);
-        // Redirect customer to their personal order status page
-        router.push(
-          `/status?order=${placedOrder.id}&brand=${effectiveBrand}${rawTableNumber ? `&table=${encodeURIComponent(rawTableNumber)}` : ""}`
-        );
+        setOrderSuccess(placed);
       } else {
-        setErrorMessage(result.error || "Failed to place order.");
+        setErrorMessage(result.error || "Failed to place order. Please try again.");
       }
     });
   };
 
   return (
-    <div className={cn("min-h-screen transition-colors duration-300", theme.bg)}>
-      {/* Minimalist Sticky Header */}
-      <header className={cn("sticky top-0 z-50 backdrop-blur-md border-b", theme.headerBg)}>
-        <div className="max-w-3xl mx-auto px-4 min-h-[4rem] py-2 flex items-center justify-between w-full">
-          {/* Left spacer – flexible to keep title centered while allowing right side content */}
-          <div className="flex-1 flex items-center justify-start min-w-[32px]" />
+    <div
+      className="min-h-screen w-full flex justify-center items-center py-0 sm:py-6 relative transition-colors duration-500"
+      style={{
+        backgroundImage: `url('${theme.bgPattern}')`,
+        backgroundSize: "400px",
+        backgroundRepeat: "repeat",
+        backgroundColor: theme.bgColor,
+      }}
+    >
+      {/* Pattern definitions */}
+      <JapanesePatternDefs />
 
-          <div className="flex-1 flex items-center justify-center">
-            {effectiveBrand === "batchoy-shop" ? (
-              <Image
-                src="/batchoyshop-logo-removebg-preview.png"
-                alt="Batchoy Shop"
-                width={180}
-                height={48}
-                className="h-10 sm:h-12 w-auto object-contain scale-[2.5] origin-center dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
-                priority
-              />
-            ) : (
-              <Image
-                src="/kyles-logo.jpg"
-                alt="Kyle's Eatery"
-                width={48}
-                height={48}
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-sm object-cover border border-zinc-100"
-                priority
-              />
+      {/* Vignette / dark overlay on large screens */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
+
+      {/* Centered Mobile Screen Container */}
+      <main className="w-full sm:max-w-[430px] min-h-screen sm:min-h-[890px] bg-white sm:rounded-[40px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] flex flex-col relative z-10 overflow-hidden border-0 sm:border-8 sm:border-stone-800 transition-all duration-300">
+        
+        {/* Top App Header (exact matching phone mockup) */}
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-5 pt-4 pb-3 flex items-center justify-between border-b border-stone-100">
+          {/* Left: Back chevron button */}
+          <button
+            onClick={() => router.back()}
+            aria-label="Back"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-stone-700 hover:bg-stone-100 active:scale-90 transition-transform -ml-1"
+          >
+            <ChevronLeft size={22} strokeWidth={2.2} />
+          </button>
+
+          {/* Center: Restaurant Brand Name */}
+          <div className="text-center">
+            <span className="text-[12px] sm:text-[13px] font-medium tracking-wide text-stone-600 uppercase block">
+              {theme.brandName}
+            </span>
+            {rawTableNumber && (
+              <span
+                className="text-[10px] font-semibold tracking-wider uppercase"
+                style={{ color: theme.accent }}
+              >
+                Table {rawTableNumber}
+              </span>
             )}
           </div>
 
-          {/* Right side: table badge + icon-only orders button */}
-          <div className="flex-1 flex items-center justify-end gap-2">
-            {rawTableNumber ? (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase shadow-sm whitespace-nowrap">
-                <Armchair className="w-3.5 h-3.5 text-zinc-500 shrink-0" strokeWidth={2} />
-                <span>Table {String(rawTableNumber).padStart(2, '0')}</span>
+          {/* Right: Cart link with count badge */}
+          <button
+            onClick={() => setCartOpen(true)}
+            aria-label="View Cart"
+            className="relative flex items-center gap-1.5 py-1 px-2.5 rounded-full hover:bg-stone-100 active:scale-95 transition"
+          >
+            <span className="text-xs font-semibold text-stone-800 tracking-tight">
+              Cart
+            </span>
+            {totalCount() > 0 && (
+              <span
+                className="w-5 h-5 text-white text-[11px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
+                style={{ backgroundColor: theme.accent }}
+              >
+                {totalCount()}
               </span>
-            ) : null}
+            )}
+          </button>
+        </header>
 
-            {/* Icon-only Check Orders button — links to /status passing table ID */}
-            <Link
-              href={
-                rawTableNumber
-                  ? `/status?table=${encodeURIComponent(rawTableNumber)}`
-                  : lastPlacedOrder
-                  ? `/status?order=${lastPlacedOrder.id}`
-                  : `/status`
-              }
-              onClick={(e) => {
-                if (!rawTableNumber && typeof window !== "undefined") {
-                  const storedTable = localStorage.getItem("kyles_current_table");
-                  if (storedTable) {
-                    e.preventDefault();
-                    router.push(`/status?table=${encodeURIComponent(storedTable)}&brand=${effectiveBrand}`);
-                    return;
-                  }
-                  const storedOrder = localStorage.getItem("kyles_last_order_id");
-                  if (storedOrder) {
-                    e.preventDefault();
-                    router.push(`/status?order=${encodeURIComponent(storedOrder)}&brand=${effectiveBrand}`);
-                    return;
-                  }
-                }
-              }}
-              aria-label="Check Orders"
+
+        {/* Section Heading & Subtle View Switcher */}
+        <div className="px-5 pt-2 pb-2 flex items-center justify-between">
+          <div className="w-14" />
+          <h1 className="text-xl sm:text-[22px] font-semibold tracking-[0.22em] text-[#374151] uppercase font-sans text-center">
+            {theme.title}
+          </h1>
+          {/* Subtle View Switcher */}
+          <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded-lg shrink-0">
+            <button
+              onClick={() => handleSetViewMode("cards")}
+              aria-label="Card View"
+              title="Card View"
               className={cn(
-                "relative p-2 rounded-full transition-colors",
-                effectiveBrand === "kyles-eatery"
-                  ? "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                "p-1.5 rounded-md transition-all",
+                viewMode === "cards" ? "bg-white text-stone-900 shadow-xs" : "text-stone-400 hover:text-stone-700"
               )}
             >
-              <Receipt size={20} strokeWidth={1.8} />
-              {/* Notification dot – only shown when hasActiveOrders is true */}
-              {hasActiveOrders && (
-                <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              onClick={() => handleSetViewMode("list")}
+              aria-label="List View"
+              title="List View"
+              className={cn(
+                "p-1.5 rounded-md transition-all",
+                viewMode === "list" ? "bg-white text-stone-900 shadow-xs" : "text-stone-400 hover:text-stone-700"
               )}
-            </Link>
+            >
+              <Rows3 size={15} />
+            </button>
           </div>
         </div>
-      </header>
 
-      {/* Read-Only Mode Banner */}
-      {!isOrderingEnabled && (
-        <div className={cn("px-4 py-2.5 text-center border-b", theme.readOnly)}>
-          <p className="text-xs font-medium">
-            Read-only mode &mdash; scan the QR code on your table to order
-          </p>
-        </div>
-      )}
+        {/* The Exact Card View (matching user's attached staggered mockup) OR List View */}
+        {viewMode === "cards" ? (
+          <div className="flex-1 overflow-y-auto px-4 pb-28 pt-8">
+            <div className="grid grid-cols-2 gap-3.5 sm:gap-4">
+              {/* Left Column (starts at normal offset) */}
+              <div className="flex flex-col gap-9 sm:gap-10">
+                {itemsToRender
+                  .filter((_, idx) => idx % 2 === 0)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
 
-      {/* Menu Subtitle */}
-      <div className="max-w-3xl mx-auto px-4 pt-6 pb-4">
-        <p className={cn("text-[11px] font-bold uppercase tracking-widest", theme.subtext)}>
-          Daily Menu
-        </p>
-        <p className={cn("text-xs mt-0.5", theme.subtext)}>
-          {theme.brandTagline}
-        </p>
-      </div>
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          setModalItem({ item, imageUrl, patternId });
+                        }}
+                      />
+                    );
+                  })}
+              </div>
 
-      {/* Menu Grid */}
-      <div className="max-w-3xl mx-auto px-4 pb-36">
-        <AnimatePresence mode="wait">
-          <motion.div key={effectiveBrand + "-grid"}
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {filteredItems.map((item) => {
-              const cartEntry = cartItems.find((c) => c.menuItem.id === item.id);
+              {/* Right Column (Staggered downwards by 46px matching mockup) */}
+              <div className="flex flex-col gap-9 sm:gap-10 pt-11 sm:pt-12">
+                {itemsToRender
+                  .filter((_, idx) => idx % 2 === 1)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          setModalItem({ item, imageUrl, patternId });
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* List View (matching previous list mockup) */
+          <div className="flex-1 overflow-y-auto divide-y-0 px-1 pb-28 pt-1">
+            {itemsToRender.map((item, idx) => {
+              const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+              const qty = inCart?.quantity || 0;
+              const basePattern = BASE_PATTERN_NAMES[idx % BASE_PATTERN_NAMES.length];
+              const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+              const imageUrl = item.image_url || PLACEHOLDER_IMAGES[idx % PLACEHOLDER_IMAGES.length];
+
               return (
-                <MenuCard key={item.id} item={item} theme={theme}
-                  inCart={!!cartEntry} qty={cartEntry?.quantity || 0}
-                  isOrderingEnabled={isOrderingEnabled}
-                  onAdd={() => addItem(item)}
-                  onInc={() => updateQuantity(item.id, 1)}
-                  onDec={() => updateQuantity(item.id, -1)}
+                <SushiListRow
+                  key={item.id}
+                  item={item}
+                  imageUrl={imageUrl}
+                  patternId={patternId}
+                  theme={theme}
+                  qtyInCart={qty}
+                  onClick={() => setModalItem({ item, imageUrl, patternId })}
+                  onAddClick={(e) => {
+                    e.stopPropagation();
+                    setModalItem({ item, imageUrl, patternId });
+                  }}
                 />
               );
             })}
-          </motion.div>
+          </div>
+        )}
+
+        {/* Floating Cart Button (when items in cart) */}
+        <AnimatePresence>
+          {totalCount() > 0 && !isCartOpen && (
+            <motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="absolute bottom-5 inset-x-5 z-30"
+            >
+              <button
+                onClick={() => setCartOpen(true)}
+                className="w-full py-3.5 px-6 rounded-full text-white font-semibold text-sm shadow-xl flex items-center justify-between active:scale-[0.98] transition-all"
+                style={{ backgroundColor: theme.accent }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center font-mono text-xs font-bold">
+                    {totalCount()}
+                  </span>
+                  <span>View Order</span>
+                </div>
+                <span className="font-mono text-base font-bold">
+                  {formatPrice(subtotal())}
+                </span>
+              </button>
+            </motion.div>
+          )}
         </AnimatePresence>
-      </div>
 
-      {/* Floating Cart Bubble (FAB) */}
-      <AnimatePresence>
-        {isOrderingEnabled && totalCount() > 0 && !isCartOpen && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setCartOpen(true)}
-            aria-label="View Cart"
-            className={cn(
-              "fixed bottom-6 right-6 w-16 h-16 z-50 rounded-full shadow-xl shadow-black/20 flex items-center justify-center transition-colors",
-              effectiveBrand === "kyles-eatery"
-                ? "bg-orange-500 hover:bg-orange-600 text-white"
-                : "bg-red-600 hover:bg-red-700 text-white"
-            )}
-          >
-            <ShoppingCart size={26} strokeWidth={2.2} />
-            {/* Notification Badge */}
-            <span className="absolute -top-1 -right-1 w-6 h-6 bg-zinc-900 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm font-mono">
-              {totalCount()}
-            </span>
-          </motion.button>
+        {/* Active orders indicator */}
+        {hasActiveOrders && (
+          <div className="absolute top-16 right-4 z-30">
+            <Link
+              href={`/status${rawTableNumber ? `?table=${encodeURIComponent(rawTableNumber)}` : ""}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900/90 text-white text-[11px] font-medium shadow-lg backdrop-blur-sm hover:bg-stone-900 transition"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Track Orders</span>
+            </Link>
+          </div>
         )}
-      </AnimatePresence>
 
-      {/* Cart Drawer */}
-      <AnimatePresence>
-        {isCartOpen && isOrderingEnabled && (
-          <CartDrawer
-            theme={theme} rawTableNumber={rawTableNumber}
-            onSubmit={handlePlaceOrder} isPending={isPending}
-            errorMessage={errorMessage} onClose={() => setCartOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+        {/* Item Detail / Add to Cart Modal (Bottom sheet) */}
+        <AnimatePresence>
+          {modalItem && (
+            <ItemDetailModal
+              item={modalItem.item}
+              imageUrl={modalItem.imageUrl}
+              patternId={modalItem.patternId}
+              theme={theme}
+              initialQty={
+                cartItems.find((c) => c.menuItem.id === modalItem.item.id)?.quantity || 1
+              }
+              onClose={() => setModalItem(null)}
+              onAddToCart={(item, qty, instructions) => {
+                addItem(item, qty, instructions);
+              }}
+            />
+          )}
+        </AnimatePresence>
 
-      {/* Success Modal */}
-      <AnimatePresence>
-        {orderSuccess && (
-          <SuccessModal order={orderSuccess} theme={theme} brand={effectiveBrand} rawTableNumber={rawTableNumber} onClose={() => setOrderSuccess(null)} />
-        )}
-      </AnimatePresence>
+        {/* Cart Drawer */}
+        <AnimatePresence>
+          {isCartOpen && (
+            <CartDrawer
+              tableNumber={rawTableNumber}
+              theme={theme}
+              onSubmit={handlePlaceOrder}
+              isPending={isPending}
+              errorMessage={errorMessage}
+              onClose={() => setCartOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Success Modal */}
+        <AnimatePresence>
+          {orderSuccess && (
+            <OrderSuccessModal
+              order={orderSuccess}
+              tableNumber={rawTableNumber}
+              theme={theme}
+              onClose={() => setOrderSuccess(null)}
+            />
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 }

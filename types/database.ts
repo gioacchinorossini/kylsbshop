@@ -24,6 +24,7 @@ export interface MenuItem {
   spiciness_level: number;
   created_at: string;
   updated_at: string;
+  brand_schedule?: string | null;
 }
 
 export interface DiningTable {

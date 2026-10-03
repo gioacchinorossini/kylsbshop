@@ -60,6 +60,10 @@ export default function DemoControlWidget() {
   const isPos  = pathname === "/pos";
   const isAdmin = pathname.startsWith("/admin");
 
+  if (isAdmin) {
+    return null;
+  }
+
   return (
     <>
       {/* Floating trigger */}
