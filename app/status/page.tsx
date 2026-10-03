@@ -3,8 +3,9 @@
 import { Suspense, useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ChefHat, Clock, Utensils, ReceiptText, ArrowLeft, RefreshCw, ShoppingBag } from 'lucide-react';
+import { CheckCircle, ChefHat, Clock, Utensils, ReceiptText, Receipt, ArrowLeft, RefreshCw, ShoppingBag, Armchair } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getOrderByIdAction, getOrdersByTableAction } from '@/app/actions/orders';
 import { subscribeToCustomerOrder, subscribeToTableOrders } from '@/lib/realtime/customer-order';
 import { Order, OrderStatus } from '@/types/database';
@@ -82,6 +83,8 @@ function statusToStep(status: OrderStatus): number {
     case 'completed':
       return 2;
     case 'cancelled':
+    case 'Archived':
+    case 'archived':
       return -1;
     default:
       return 0;
@@ -272,34 +275,79 @@ export function CustomerStatusContent() {
 
     try {
       if (rawTableNumber) {
-        // Table view: fetch ALL active orders belonging to this table
+        // Table view: fetch active orders belonging to this table (excluding archived)
         const res = await getOrdersByTableAction(rawTableNumber);
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setOrders(res.data);
-          // Set active order if not already selected, or if current selection not found
-          setActiveOrderId((prev) => {
-            if (prev && res.data?.some((o) => o.id === prev)) return prev;
-            if (orderIdParam && res.data?.some((o) => o.id === orderIdParam)) return orderIdParam;
-            // Prefer first active order, else latest order
-            const active = res.data?.find((o) => ['pending', 'preparing', 'ready'].includes(o.status));
-            return active ? active.id : res.data![0].id;
-          });
+          const validOrders = res.data.filter(
+            (o) => o.status !== 'Archived' && o.status !== 'archived'
+          );
+          setOrders(validOrders);
+          if (typeof window !== 'undefined') {
+            const activeRemaining = validOrders.filter((o) =>
+              ['pending', 'preparing', 'ready'].includes(o.status)
+            );
+            if (activeRemaining.length === 0) {
+              try {
+                localStorage.removeItem('@kyle_pos_my_orders');
+              } catch {}
+            }
+          }
+          if (validOrders.length > 0) {
+            // Set active order if not already selected, or if current selection not found
+            setActiveOrderId((prev) => {
+              if (prev && validOrders.some((o) => o.id === prev)) return prev;
+              if (orderIdParam && validOrders.some((o) => o.id === orderIdParam)) return orderIdParam;
+              // Prefer first active order, else latest order
+              const active = validOrders.find((o) => ['pending', 'preparing', 'ready'].includes(o.status));
+              return active ? active.id : validOrders[0].id;
+            });
+          } else {
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('@kyle_pos_my_orders');
+                localStorage.removeItem('kyles_last_order_id');
+              } catch {}
+            }
+            setOrders([]);
+          }
         } else if (orderIdParam) {
           // Fallback to specific orderId if table query returned nothing
           const singleRes = await getOrderByIdAction(orderIdParam);
-          if (singleRes.success && singleRes.data) {
+          if (
+            singleRes.success &&
+            singleRes.data &&
+            singleRes.data.status !== 'Archived' &&
+            singleRes.data.status !== 'archived'
+          ) {
             setOrders([singleRes.data]);
             setActiveOrderId(singleRes.data.id);
           } else {
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('@kyle_pos_my_orders');
+                localStorage.removeItem('kyles_last_order_id');
+              } catch {}
+            }
             setOrders([]);
           }
         } else {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('@kyle_pos_my_orders');
+              localStorage.removeItem('kyles_last_order_id');
+            } catch {}
+          }
           setOrders([]);
         }
       } else if (orderIdParam) {
         // Single order view
         const res = await getOrderByIdAction(orderIdParam);
-        if (res.success && res.data) {
+        if (
+          res.success &&
+          res.data &&
+          res.data.status !== 'Archived' &&
+          res.data.status !== 'archived'
+        ) {
           setOrders([res.data]);
           setActiveOrderId(res.data.id);
 
@@ -310,7 +358,12 @@ export function CustomerStatusContent() {
           if (matchedTable) {
             getOrdersByTableAction(matchedTable).then((tableRes) => {
               if (tableRes.success && Array.isArray(tableRes.data) && tableRes.data.length > 0) {
-                setOrders(tableRes.data);
+                const validTableOrders = tableRes.data.filter(
+                  (o) => o.status !== 'Archived' && o.status !== 'archived'
+                );
+                if (validTableOrders.length > 0) {
+                  setOrders(validTableOrders);
+                }
               }
             });
           }
@@ -329,18 +382,31 @@ export function CustomerStatusContent() {
         if (storedTable) {
           const res = await getOrdersByTableAction(storedTable);
           if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-            setOrders(res.data);
-            setActiveOrderId(res.data[0].id);
-            return;
+            const valid = res.data.filter(
+              (o) => o.status !== 'Archived' && o.status !== 'archived'
+            );
+            if (valid.length > 0) {
+              setOrders(valid);
+              setActiveOrderId(valid[0].id);
+              return;
+            }
           }
         }
 
         if (storedId) {
           const res = await getOrderByIdAction(storedId);
-          if (res.success && res.data) {
+          if (
+            res.success &&
+            res.data &&
+            res.data.status !== 'Archived' &&
+            res.data.status !== 'archived'
+          ) {
             setOrders([res.data]);
             setActiveOrderId(res.data.id);
           } else {
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('kyles_last_order_id');
+            }
             setOrders([]);
           }
         } else {
@@ -437,37 +503,66 @@ export function CustomerStatusContent() {
       <div className={['min-h-screen flex flex-col', theme.bg].join(' ')}>
         {/* Brand header */}
         <header className={['sticky top-0 z-40 backdrop-blur-md border-b', theme.headerBg].join(' ')}>
-          <div className="max-w-lg mx-auto px-5 h-14 flex items-center justify-between">
-            <Link
-              href={backToMenuUrl}
-              aria-label="Back to menu"
-              className={['p-2 rounded-full transition-colors -ml-2', theme.backBtn].join(' ')}
-            >
-              <ArrowLeft size={18} />
-            </Link>
-            <h1 className={['text-base font-bold tracking-tight', theme.text].join(' ')}>
-              {theme.brandName}
-            </h1>
-            <div className="w-9" />
+          <div className="max-w-lg mx-auto px-5 min-h-[4rem] py-2 flex items-center justify-between w-full">
+            <div className="flex-1 flex items-center justify-start">
+              <Link
+                href={backToMenuUrl}
+                aria-label="Back to menu"
+                className={['p-2 rounded-full transition-colors -ml-2', theme.backBtn].join(' ')}
+              >
+                <ArrowLeft size={18} />
+              </Link>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center">
+              {brand === 'batchoy-shop' ? (
+                <Image
+                  src="/batchoyshop-logo-removebg-preview.png"
+                  alt="Batchoy Shop"
+                  width={180}
+                  height={48}
+                  className="h-10 sm:h-12 w-auto object-contain scale-[2.5] origin-center dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                  priority
+                />
+              ) : (
+                <Image
+                  src="/kyles-logo.jpg"
+                  alt="Kyle's Eatery"
+                  width={48}
+                  height={48}
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-sm object-cover border border-zinc-100"
+                  priority
+                />
+              )}
+            </div>
+
+            <div className="flex-1 flex items-center justify-end">
+              {rawTableNumber ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase shadow-sm whitespace-nowrap">
+                  <Armchair className="w-3.5 h-3.5 text-zinc-500 shrink-0" strokeWidth={2} />
+                  <span>Table {String(rawTableNumber).padStart(2, '0')}</span>
+                </span>
+              ) : (
+                <div className="w-9" />
+              )}
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center max-w-sm mx-auto">
-          <div className={['w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-sm border', theme.accentLight, theme.accentBorder].join(' ')}>
-            🧾
-          </div>
-          <p className={['text-xl font-extrabold', theme.text].join(' ')}>
-            {rawTableNumber ? `No Active Orders for Table ${rawTableNumber}` : 'No Orders to Track'}
-          </p>
-          <p className={['text-sm leading-relaxed', theme.subtext].join(' ')}>
+        <main className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
+          <Receipt className="w-20 h-20 text-zinc-200 dark:text-zinc-800 mb-6" strokeWidth={1} />
+          <h2 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+            {rawTableNumber ? `No Active Orders for Table ${String(rawTableNumber).padStart(2, '0')}` : 'No Orders to Track'}
+          </h2>
+          <p className="text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mt-3 leading-relaxed text-sm">
             {rawTableNumber
-              ? `You haven't placed an order for Table ${rawTableNumber} yet, or your previous orders are already completed.`
+              ? `You haven't placed an order for Table ${String(rawTableNumber).padStart(2, '0')} yet, or your previous orders are already completed.`
               : 'Scan your table QR code or order from the menu to track your order in real-time.'}
           </p>
           <Link
             href={backToMenuUrl}
             className={[
-              'inline-flex items-center gap-2 mt-3 px-6 py-3 rounded-full text-sm font-bold text-white transition shadow-sm active:scale-95',
+              'inline-flex items-center gap-2 mt-8 px-8 py-3.5 shadow-sm rounded-full text-sm font-bold text-white transition active:scale-95',
               theme.accentBg,
             ].join(' ')}
           >
@@ -489,28 +584,44 @@ export function CustomerStatusContent() {
     <div className={['min-h-screen flex flex-col', theme.bg].join(' ')}>
       {/* ── Brand header (Customer facing — no staff Navbar) ─────────────── */}
       <header className={['sticky top-0 z-40 backdrop-blur-md border-b', theme.headerBg].join(' ')}>
-        <div className="max-w-lg mx-auto px-5 h-14 flex items-center justify-between">
-          <Link
-            href={backToMenuUrl}
-            aria-label="Back to menu"
-            className={['p-2 rounded-full transition-colors -ml-2', theme.backBtn].join(' ')}
-          >
-            <ArrowLeft size={18} />
-          </Link>
-
-          <div className="text-center">
-            <h1 className={['text-base font-bold tracking-tight', theme.text].join(' ')}>
-              {theme.brandName}
-            </h1>
-            <p className={['text-[10px] font-semibold tracking-wide uppercase', theme.subtleText].join(' ')}>
-              Customer Order Tracker
-            </p>
+        <div className="max-w-lg mx-auto px-5 min-h-[4rem] py-2 flex items-center justify-between w-full">
+          <div className="flex-1 flex items-center justify-start">
+            <Link
+              href={backToMenuUrl}
+              aria-label="Back to menu"
+              className={['p-2 rounded-full transition-colors -ml-2', theme.backBtn].join(' ')}
+            >
+              <ArrowLeft size={18} />
+            </Link>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center justify-center">
+            {brand === 'batchoy-shop' ? (
+              <Image
+                src="/batchoyshop-logo-removebg-preview.png"
+                alt="Batchoy Shop"
+                width={180}
+                height={48}
+                className="h-10 sm:h-12 w-auto object-contain scale-[2.5] origin-center dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                priority
+              />
+            ) : (
+              <Image
+                src="/kyles-logo.jpg"
+                alt="Kyle's Eatery"
+                width={48}
+                height={48}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-sm object-cover border border-zinc-100"
+                priority
+              />
+            )}
+          </div>
+
+          <div className="flex-1 flex items-center justify-end gap-2">
             {displayTable && (
-              <span className={['text-xs font-bold px-2.5 py-1 rounded-full border', theme.tableBadge].join(' ')}>
-                Table {String(displayTable).padStart(2, '0')}
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase shadow-sm whitespace-nowrap">
+                <Armchair className="w-3.5 h-3.5 text-zinc-500 shrink-0" strokeWidth={2} />
+                <span>Table {String(displayTable).padStart(2, '0')}</span>
               </span>
             )}
             <button
@@ -544,7 +655,7 @@ export function CustomerStatusContent() {
             </p>
             {isDone && (
               <p className={['text-2xl font-extrabold', theme.text].join(' ')}>
-                Paid &amp; Completed 🎉
+                Paid &amp; Completed
               </p>
             )}
             {isCancelled && (
@@ -553,9 +664,9 @@ export function CustomerStatusContent() {
             {!isDone && !isCancelled && (
               <>
                 <p className={['text-2xl font-extrabold', theme.text].join(' ')}>
-                  {activeStep === 0 && 'Sent to Cashier ✓'}
-                  {activeStep === 1 && 'Kitchen is Preparing…'}
-                  {activeStep === 2 && 'Ready for Pickup! 🍽️'}
+                  {activeStep === 0 && 'Sent to Cashier'}
+                  {activeStep === 1 && 'Kitchen is Preparing...'}
+                  {activeStep === 2 && 'Ready for Pickup'}
                 </p>
                 {activeStep === 0 && (
                   <p className={['text-sm', theme.subtext].join(' ')}>

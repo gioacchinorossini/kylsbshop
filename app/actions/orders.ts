@@ -464,8 +464,11 @@ export async function getOrdersByTableAction(
         : (row.dining_tables as DiningTable | null) ?? null,
     })) as Order[];
 
+    // Exclude archived orders so new customer doesn't see old customer's orders
+    const nonArchivedOrders = orders.filter((o) => o.status !== 'Archived' && o.status !== 'archived');
+
     // Ensure 1 unified receipt per table by stacking all active order items together
-    const activeOrders = orders.filter((o) => ['pending', 'preparing', 'ready'].includes(o.status));
+    const activeOrders = nonArchivedOrders.filter((o) => ['pending', 'preparing', 'ready'].includes(o.status));
     if (activeOrders.length > 0) {
       const primary = activeOrders[0];
       // Collect all stacked items
@@ -479,9 +482,157 @@ export async function getOrdersByTableAction(
       return { success: true, data: [stackedReceipt] };
     }
 
-    return { success: true, data: orders.slice(0, 1) };
+    // If there are non-archived orders (e.g. recently completed and not yet archived by cashier)
+    if (nonArchivedOrders.length > 0) {
+      return { success: true, data: nonArchivedOrders.slice(0, 1) };
+    }
+
+    // All orders for this table are archived -> clear table for new customer
+    return { success: true, data: [] };
   } catch (err) {
     console.error('[getOrdersByTableAction] unexpected error:', err);
+    return { success: true, data: [] };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// archiveOrderAction (Cashier archives an order)
+// ═══════════════════════════════════════════════════════════════
+export async function archiveOrderAction(
+  orderId: string
+): Promise<ActionResponse<Order>> {
+  try {
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status: 'Archived' })
+      .eq('id', orderId)
+      .select('*, dining_tables(*), order_items(*)')
+      .single();
+
+    if (error || !data) {
+      console.warn('[archiveOrderAction]', error?.message);
+      return { success: false, error: 'Could not archive order.' };
+    }
+
+    revalidatePath('/pos');
+    revalidatePath('/kitchen');
+    revalidatePath('/orders');
+    revalidatePath('/status');
+    return { success: true, data: data as Order };
+  } catch {
+    return { success: false, error: 'Unexpected server error.' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// archiveTableOrdersAction (Archive all orders for a table to reset it for incoming customers)
+// ═══════════════════════════════════════════════════════════════
+export async function archiveTableOrdersAction(
+  tableIdentifier: string
+): Promise<ActionResponse<{ count: number }>> {
+  try {
+    if (!tableIdentifier) return { success: false, error: 'Table identifier required.' };
+    const supabase = createServerSupabaseClient();
+    const cleanTable = tableIdentifier.replace(/^table\s*/i, '').trim();
+    const isNum = /^\d+$/.test(cleanTable);
+
+    let tableId: string | null = isUUID(cleanTable) ? cleanTable : null;
+    if (!tableId && isNum) {
+      const { data: tableRow } = await supabase
+        .from('dining_tables')
+        .select('id')
+        .eq('table_number', parseInt(cleanTable, 10))
+        .maybeSingle();
+      if (tableRow?.id) tableId = tableRow.id;
+    }
+
+    let query = supabase
+      .from('orders')
+      .update({ status: 'Archived' });
+
+    if (tableId) {
+      query = query.or(`table_id.eq.${tableId},customer_notes.ilike.%Table ${cleanTable}%,customer_name.ilike.%Table ${cleanTable}%`);
+    } else {
+      query = query.or(`customer_notes.ilike.%Table ${cleanTable}%,customer_name.ilike.%Table ${cleanTable}%`);
+    }
+
+    const { data, error } = await query
+      .neq('status', 'Archived')
+      .select('id');
+
+    if (error) {
+      console.warn('[archiveTableOrdersAction]', error.message);
+      return { success: false, error: 'Could not archive table orders.' };
+    }
+
+    revalidatePath('/pos');
+    revalidatePath('/kitchen');
+    revalidatePath('/orders');
+    revalidatePath('/status');
+    return { success: true, data: { count: data?.length || 0 } };
+  } catch (err) {
+    console.error('[archiveTableOrdersAction] error:', err);
+    return { success: false, error: 'Unexpected server error.' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// unarchiveOrderAction
+// ═══════════════════════════════════════════════════════════════
+export async function unarchiveOrderAction(
+  orderId: string
+): Promise<ActionResponse<Order>> {
+  try {
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status: 'completed' })
+      .eq('id', orderId)
+      .select('*, dining_tables(*), order_items(*)')
+      .single();
+
+    if (error || !data) {
+      return { success: false, error: 'Could not unarchive order.' };
+    }
+
+    revalidatePath('/pos');
+    revalidatePath('/kitchen');
+    revalidatePath('/orders');
+    revalidatePath('/status');
+    return { success: true, data: data as Order };
+  } catch {
+    return { success: false, error: 'Unexpected server error.' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// getArchivedOrdersAction
+// ═══════════════════════════════════════════════════════════════
+export async function getArchivedOrdersAction(): Promise<ActionResponse<Order[]>> {
+  try {
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, dining_tables(*), order_items(*)')
+      .eq('status', 'Archived')
+      .order('updated_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.warn('[getArchivedOrdersAction]', error.message);
+      return { success: true, data: [] };
+    }
+
+    const orders: Order[] = (data || []).map((row: any) => ({
+      ...row,
+      dining_table: Array.isArray(row.dining_tables)
+        ? (row.dining_tables[0] as DiningTable | null) ?? null
+        : (row.dining_tables as DiningTable | null) ?? null,
+    })) as Order[];
+
+    return { success: true, data: orders };
+  } catch {
     return { success: true, data: [] };
   }
 }

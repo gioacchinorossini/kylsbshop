@@ -28,7 +28,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 2. ENUM TYPES
 -- ═══════════════════════════════════════════════════════════════
 CREATE TYPE order_status_enum AS ENUM (
-  'pending', 'preparing', 'ready', 'completed', 'cancelled'
+  'pending', 'preparing', 'ready', 'completed', 'cancelled', 'Archived'
 );
 CREATE TYPE item_status_enum AS ENUM (
   'pending', 'preparing', 'ready', 'served', 'cancelled'

@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import Link from "next/link";
+import Image from "next/image";
 import {
-  ShoppingCart, Plus, Minus, X, Flame, Leaf, ChevronDown, CheckCircle, ReceiptText,
+  ShoppingCart, Plus, Minus, X, Flame, Leaf, ChevronDown, CheckCircle, ReceiptText, Receipt, Armchair,
 } from "lucide-react";
 import { Category, MenuItem, Order } from "@/types/database";
 import { getCategoriesAction, getMenuItemsAction } from "@/app/actions/menu";
@@ -476,7 +477,26 @@ function CustomerMenuContent() {
   const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
   const [hasActiveOrder, setHasActiveOrder] = useState<boolean>(false);
+  const [hasActiveOrders, setHasActiveOrders] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Client-side check for active orders from @kyle_pos_my_orders
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("@kyle_pos_my_orders");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setHasActiveOrders(true);
+          return;
+        }
+      }
+      setHasActiveOrders(false);
+    } catch {
+      setHasActiveOrders(false);
+    }
+  }, []);
 
   useEffect(() => {
     setActiveBrand(effectiveBrand);
@@ -575,6 +595,13 @@ function CustomerMenuContent() {
             if (rawTableNumber) {
               localStorage.setItem(`kyles_table_${rawTableNumber}_last_order`, placedOrder.id);
             }
+            const rawMyOrders = localStorage.getItem("@kyle_pos_my_orders");
+            const parsedMyOrders = rawMyOrders ? JSON.parse(rawMyOrders) : [];
+            const updatedMyOrders = Array.isArray(parsedMyOrders)
+              ? [...parsedMyOrders, placedOrder.id]
+              : [placedOrder.id];
+            localStorage.setItem("@kyle_pos_my_orders", JSON.stringify(updatedMyOrders));
+            setHasActiveOrders(true);
           } catch {}
         }
         clearCart();
@@ -593,19 +620,38 @@ function CustomerMenuContent() {
     <div className={cn("min-h-screen transition-colors duration-300", theme.bg)}>
       {/* Minimalist Sticky Header */}
       <header className={cn("sticky top-0 z-50 backdrop-blur-md border-b", theme.headerBg)}>
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between relative">
-          {/* Left spacer – mirrors the right side width to keep title perfectly centred */}
-          <div className="w-20" />
+        <div className="max-w-3xl mx-auto px-4 min-h-[4rem] py-2 flex items-center justify-between w-full">
+          {/* Left spacer – flexible to keep title centered while allowing right side content */}
+          <div className="flex-1 flex items-center justify-start min-w-[32px]" />
 
-          <h1 className={cn("absolute left-1/2 -translate-x-1/2 text-lg font-bold tracking-tight whitespace-nowrap", theme.text)}>
-            {theme.brandName}
-          </h1>
+          <div className="flex-1 flex items-center justify-center">
+            {effectiveBrand === "batchoy-shop" ? (
+              <Image
+                src="/batchoyshop-logo-removebg-preview.png"
+                alt="Batchoy Shop"
+                width={180}
+                height={48}
+                className="h-10 sm:h-12 w-auto object-contain scale-[2.5] origin-center dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                priority
+              />
+            ) : (
+              <Image
+                src="/kyles-logo.jpg"
+                alt="Kyle's Eatery"
+                width={48}
+                height={48}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-sm object-cover border border-zinc-100"
+                priority
+              />
+            )}
+          </div>
 
           {/* Right side: table badge + icon-only orders button */}
-          <div className="w-20 flex items-center justify-end gap-1.5">
+          <div className="flex-1 flex items-center justify-end gap-2">
             {rawTableNumber ? (
-              <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", theme.tableBadge)}>
-                Table {rawTableNumber}
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase shadow-sm whitespace-nowrap">
+                <Armchair className="w-3.5 h-3.5 text-zinc-500 shrink-0" strokeWidth={2} />
+                <span>Table {String(rawTableNumber).padStart(2, '0')}</span>
               </span>
             ) : null}
 
@@ -642,10 +688,10 @@ function CustomerMenuContent() {
                   : "text-zinc-400 hover:text-white hover:bg-zinc-800"
               )}
             >
-              <ReceiptText size={20} strokeWidth={1.8} />
-              {/* Notification dot – shown when there's an active or previously placed order */}
-              {(hasActiveOrder || lastPlacedOrder) && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
+              <Receipt size={20} strokeWidth={1.8} />
+              {/* Notification dot – only shown when hasActiveOrders is true */}
+              {hasActiveOrders && (
+                <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
               )}
             </Link>
           </div>
