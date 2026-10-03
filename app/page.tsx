@@ -281,6 +281,122 @@ function formatPrice(val: number | string): string {
   return `₱${num.toFixed(0)}`;
 }
 
+// ─── Exact Circular Plus & Minus Buttons Matching Reference Crop ─────────────
+function MockupPlusButton({
+  onClick,
+  color,
+  ariaLabel,
+  className = "",
+  size = 36,
+}: {
+  onClick: (e: React.MouseEvent) => void;
+  color: string;
+  ariaLabel?: string;
+  className?: string;
+  size?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={cn(
+        "relative rounded-full flex items-center justify-center transition-all duration-150 active:scale-90 hover:scale-105 shrink-0 select-none shadow-xs",
+        className
+      )}
+      style={{ width: size, height: size, color }}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full"
+      >
+        {/* Exact outer ring with 2.5px stroke matching crop */}
+        <circle
+          cx="18"
+          cy="18"
+          r="16.5"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        />
+        {/* Exact plus cross with 3.0px bold stroke and rounded tips */}
+        <line
+          x1="18"
+          y1="9.5"
+          x2="18"
+          y2="26.5"
+          stroke="currentColor"
+          strokeWidth="3.0"
+          strokeLinecap="round"
+        />
+        <line
+          x1="9.5"
+          y1="18"
+          x2="26.5"
+          y2="18"
+          stroke="currentColor"
+          strokeWidth="3.0"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+function MockupMinusButton({
+  onClick,
+  color,
+  ariaLabel,
+  className = "",
+  size = 36,
+}: {
+  onClick: (e: React.MouseEvent) => void;
+  color: string;
+  ariaLabel?: string;
+  className?: string;
+  size?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={cn(
+        "relative rounded-full flex items-center justify-center transition-all duration-150 active:scale-90 hover:scale-105 shrink-0 select-none shadow-xs",
+        className
+      )}
+      style={{ width: size, height: size, color }}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full"
+      >
+        <circle
+          cx="18"
+          cy="18"
+          r="16.5"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        />
+        <line
+          x1="9.5"
+          y1="18"
+          x2="26.5"
+          y2="18"
+          stroke="currentColor"
+          strokeWidth="3.0"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
 // ─── Exact List Row Component (Matching user image) ─────────────────────────
 function SushiListRow({
   item,
@@ -302,25 +418,25 @@ function SushiListRow({
   return (
     <div
       onClick={onClick}
-      className="group relative flex items-center justify-between py-3.5 px-4 cursor-pointer select-none transition-colors hover:bg-stone-50/60 active:bg-stone-100/50"
+      className="group relative flex items-center justify-between py-2 sm:py-3 px-1 sm:px-2 cursor-pointer select-none transition-all active:opacity-85"
     >
       {/* Left: Medallion with Dish Overlap */}
-      <div className="relative flex items-center shrink-0 w-[94px] h-[94px]">
+      <div className="relative flex items-center shrink-0 w-[84px] h-[84px] sm:w-[92px] sm:h-[92px] -ml-1 sm:ml-0">
         {/* Japanese Patterned Circle */}
         <svg
-          width="82"
-          height="82"
-          viewBox="0 0 82 82"
-          className="rounded-full shadow-inner shrink-0"
+          width="80"
+          height="80"
+          viewBox="0 0 80 80"
+          className="rounded-full shadow-inner shrink-0 sm:w-[88px] sm:h-[88px]"
         >
-          <circle cx="41" cy="41" r="41" fill={`url(#${patternId})`} />
+          <circle cx="40" cy="40" r="40" fill={`url(#${patternId})`} />
         </svg>
 
         {/* Food image floating in front, slightly offset to the right and bottom */}
         <div
-          className="absolute -right-1 top-2 w-[82px] h-[82px] pointer-events-none transition-transform duration-300 group-hover:scale-105"
+          className="absolute -right-1 top-2 w-[74px] h-[74px] sm:w-[82px] sm:h-[82px] pointer-events-none transition-transform duration-300 group-hover:scale-105"
           style={{
-            filter: "drop-shadow(4px 7px 12px rgba(0, 0, 0, 0.28))",
+            filter: "drop-shadow(4px 8px 12px rgba(0, 0, 0, 0.28))",
           }}
         >
           <Image
@@ -335,9 +451,9 @@ function SushiListRow({
       </div>
 
       {/* Middle: Name & Price */}
-      <div className="flex-1 min-w-0 pl-4 pr-3 flex flex-col justify-center">
+      <div className="flex-1 min-w-0 pl-4 sm:pl-5 pr-2 flex flex-col justify-center">
         {/* Title in soft slate gray matching mockup */}
-        <h3 className="text-[17px] sm:text-[18px] font-medium text-[#4b5563] tracking-tight leading-snug truncate">
+        <h3 className="text-[16px] sm:text-[17px] font-medium text-[#52525b] tracking-normal leading-snug truncate">
           {item.name}
         </h3>
 
@@ -351,7 +467,7 @@ function SushiListRow({
       </div>
 
       {/* Right: Circular Plus (+) Button in Brand Accent */}
-      <div className="flex items-center gap-2 shrink-0 pr-1">
+      <div className="flex items-center gap-2 shrink-0 pr-1 sm:pr-2">
         {qtyInCart > 0 && (
           <span
             className="w-5 h-5 text-white text-[11px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
@@ -361,25 +477,12 @@ function SushiListRow({
           </span>
         )}
 
-        <button
+        <MockupPlusButton
           onClick={onAddClick}
-          aria-label={`Add ${item.name} to cart`}
-          className="w-10 h-10 rounded-full border-[2.2px] flex items-center justify-center active:scale-90 transition-all duration-150 shadow-xs"
-          style={{
-            borderColor: theme.accent,
-            color: theme.accent,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = theme.accent;
-            e.currentTarget.style.color = "#ffffff";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.color = theme.accent;
-          }}
-        >
-          <Plus size={20} strokeWidth={2.8} />
-        </button>
+          color={theme.accent}
+          ariaLabel={`Add ${item.name} to cart`}
+          size={36}
+        />
       </div>
     </div>
   );
@@ -406,10 +509,10 @@ function SushiCardItem({
   return (
     <div
       onClick={onClick}
-      className="group relative bg-white rounded-[26px] shadow-[0_12px_28px_-6px_rgba(0,0,0,0.08)] hover:shadow-[0_18px_36px_-6px_rgba(0,0,0,0.12)] border border-stone-100/70 pt-[72px] pb-4 px-3 flex flex-col items-center cursor-pointer select-none transition-all duration-300 active:scale-[0.98]"
+      className="group relative bg-white rounded-[26px] shadow-[0_12px_28px_-6px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_35px_-8px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 border border-stone-100/70 pt-[72px] sm:pt-[78px] pb-4 sm:pb-5 px-3 sm:px-4 flex flex-col items-center cursor-pointer select-none transition-all duration-300 active:scale-[0.98]"
     >
       {/* Overflowing Japanese Pattern Medallion */}
-      <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-[84px] h-[84px] rounded-full overflow-hidden shadow-xs pointer-events-none transition-transform duration-300 group-hover:scale-105">
+      <div className="absolute -top-7 sm:-top-8 left-1/2 -translate-x-1/2 w-[84px] h-[84px] sm:w-[92px] sm:h-[92px] rounded-full overflow-hidden shadow-xs pointer-events-none transition-transform duration-300 group-hover:scale-105">
         <svg className="w-full h-full" viewBox="0 0 84 84">
           <circle cx="42" cy="42" r="42" fill={`url(#${patternId})`} />
         </svg>
@@ -417,7 +520,7 @@ function SushiCardItem({
 
       {/* Overflowing Food Cutout Image with Realistic Drop Shadow */}
       <div
-        className="absolute -top-4 left-1/2 -translate-x-1/2 w-[80px] h-[80px] pointer-events-none transition-transform duration-300 group-hover:scale-110 flex items-center justify-center"
+        className="absolute -top-4 sm:-top-5 left-1/2 -translate-x-1/2 w-[80px] h-[80px] sm:w-[88px] sm:h-[88px] pointer-events-none transition-transform duration-300 group-hover:scale-110 flex items-center justify-center"
         style={{
           filter: "drop-shadow(4px 10px 10px rgba(0, 0, 0, 0.32))",
         }}
@@ -425,8 +528,8 @@ function SushiCardItem({
         <Image
           src={imageUrl}
           alt={item.name}
-          width={84}
-          height={84}
+          width={92}
+          height={92}
           className="w-full h-full object-contain"
           priority
         />
@@ -435,7 +538,7 @@ function SushiCardItem({
       {/* Cart quantity badge if already in cart */}
       {qtyInCart > 0 && (
         <span
-          className="absolute top-2 right-2 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
+          className="absolute top-2.5 right-2.5 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
           style={{ backgroundColor: theme.accent }}
         >
           {qtyInCart}
@@ -443,38 +546,26 @@ function SushiCardItem({
       )}
 
       {/* Item Title */}
-      <h3 className="text-[13px] sm:text-[14px] font-medium text-[#374151] text-center truncate w-full px-1 mt-1 leading-snug">
+      <h3 className="text-[14px] sm:text-[15px] font-medium text-[#52525b] text-center truncate w-full px-1 mt-1 leading-snug">
         {item.name}
       </h3>
 
       {/* Item Price */}
       <p
-        className="text-[14px] sm:text-[15px] font-bold text-center mt-0.5 tracking-tight font-sans transition-colors"
+        className="text-[15px] sm:text-[16px] font-bold text-center mt-0.5 tracking-tight font-sans transition-colors"
         style={{ color: theme.accent }}
       >
         {formatPrice(item.price)}
       </p>
 
       {/* Circular Plus (+) Button matching mockup */}
-      <button
+      <MockupPlusButton
         onClick={onAddClick}
-        aria-label={`Add ${item.name} to cart`}
-        className="w-9 h-9 rounded-full border-[2.2px] flex items-center justify-center mt-2.5 mb-0.5 transition-all duration-150 active:scale-90 hover:scale-105 shadow-xs"
-        style={{
-          borderColor: theme.accent,
-          color: theme.accent,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = theme.accent;
-          e.currentTarget.style.color = "#ffffff";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "transparent";
-          e.currentTarget.style.color = theme.accent;
-        }}
-      >
-        <Plus size={18} strokeWidth={2.6} />
-      </button>
+        color={theme.accent}
+        ariaLabel={`Add ${item.name} to cart`}
+        size={36}
+        className="mt-2.5 mb-0.5"
+      />
     </div>
   );
 }
@@ -519,15 +610,15 @@ function ItemDetailModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
-        initial={{ y: "100%", opacity: 0.5 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: "100%", opacity: 0 }}
-        transition={{ type: "spring", damping: 28, stiffness: 300 }}
-        className="w-full sm:max-w-sm bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl relative flex flex-col"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: "spring", damping: 26, stiffness: 320 }}
+        className="w-full max-w-[340px] sm:max-w-sm bg-white rounded-[32px] overflow-hidden shadow-2xl relative flex flex-col items-center"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -540,7 +631,7 @@ function ItemDetailModal({
         </button>
 
         {/* Top Japanese Arch Graphic with Dish Image */}
-        <div className="relative pt-6 pb-2 px-6 flex flex-col items-center justify-center">
+        <div className="relative pt-6 pb-2 px-6 flex flex-col items-center justify-center w-full">
           {/* Circular/Arch patterned backdrop */}
           <div className="relative w-44 h-44 rounded-full overflow-hidden shadow-lg border-2 border-stone-200/50 flex items-center justify-center">
             <svg width="176" height="176" viewBox="0 0 176 176" className="w-full h-full">
@@ -568,12 +659,15 @@ function ItemDetailModal({
         </div>
 
         {/* Content Section */}
-        <div className="px-6 pt-3 pb-8 flex flex-col items-center text-center space-y-4">
+        <div className="w-full px-6 pt-3 pb-8 flex flex-col items-center text-center space-y-4">
           <div>
             <h3 className="text-xl font-bold text-stone-900 tracking-tight">
               {item.name}
             </h3>
-            <p className="text-sm font-semibold text-stone-500 mt-0.5 font-mono">
+            <p
+              className="text-sm font-bold mt-0.5 font-sans"
+              style={{ color: theme.accent }}
+            >
               {formatPrice(item.price)}
             </p>
             {item.description && (
@@ -583,29 +677,33 @@ function ItemDetailModal({
             )}
           </div>
 
-          {/* Quantity Controls: [-] [ 1 ] [+] */}
-          <div className="flex items-center justify-center gap-4 pt-1">
-            <button
+          {/* Quantity Controls: [-] [ 1 ] [+] (Exact matching reference in Red theme.accent) */}
+          <div className="w-full flex items-center justify-center gap-3.5 pt-1">
+            <MockupMinusButton
               onClick={handleDec}
-              aria-label="Decrease quantity"
-              className="w-10 h-10 rounded-full border border-stone-300 text-stone-700 flex items-center justify-center hover:bg-stone-100 hover:border-stone-400 active:scale-90 transition-all shadow-sm"
-            >
-              <Minus size={18} strokeWidth={2} />
-            </button>
+              ariaLabel="Decrease quantity"
+              color={theme.accent}
+              size={38}
+            />
 
-            <div className="w-24 h-11 border border-stone-300 rounded-xl flex items-center justify-center bg-stone-50/50 shadow-inner">
-              <span className="text-lg font-bold font-mono text-stone-900">
+            <div
+              className="w-24 h-[38px] rounded-xl flex items-center justify-center bg-white shadow-xs border-[1.8px]"
+              style={{ borderColor: theme.accent }}
+            >
+              <span
+                className="text-lg font-bold font-mono"
+                style={{ color: theme.accent }}
+              >
                 {qty}
               </span>
             </div>
 
-            <button
+            <MockupPlusButton
               onClick={handleInc}
-              aria-label="Increase quantity"
-              className="w-10 h-10 rounded-full border border-stone-300 text-stone-700 flex items-center justify-center hover:bg-stone-100 hover:border-stone-400 active:scale-90 transition-all shadow-sm"
-            >
-              <Plus size={18} strokeWidth={2} />
-            </button>
+              ariaLabel="Increase quantity"
+              color={theme.accent}
+              size={38}
+            />
           </div>
 
           {/* Optional Special Instructions */}
@@ -724,21 +822,24 @@ function CartDrawer({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
+                    <MockupMinusButton
                       onClick={() => updateQuantity(c.menuItem.id, -1)}
-                      className="w-7 h-7 rounded-full bg-white border border-stone-200 hover:bg-stone-100 flex items-center justify-center text-stone-700 transition"
+                      ariaLabel="Decrease quantity"
+                      color={theme.accent}
+                      size={28}
+                    />
+                    <span
+                      className="w-5 text-center text-sm font-bold font-mono"
+                      style={{ color: theme.accent }}
                     >
-                      <Minus size={12} />
-                    </button>
-                    <span className="w-5 text-center text-sm font-bold font-mono text-stone-800">
                       {c.quantity}
                     </span>
-                    <button
+                    <MockupPlusButton
                       onClick={() => updateQuantity(c.menuItem.id, 1)}
-                      className="w-7 h-7 rounded-full bg-white border border-stone-200 hover:bg-stone-100 flex items-center justify-center text-stone-700 transition"
-                    >
-                      <Plus size={12} />
-                    </button>
+                      ariaLabel="Increase quantity"
+                      color={theme.accent}
+                      size={28}
+                    />
                   </div>
                 </div>
 
@@ -1116,42 +1217,50 @@ function CustomerMenuContent() {
       {/* Vignette / dark overlay on large screens */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
 
-      {/* Centered Mobile Screen Container */}
-      <main className="w-full sm:max-w-[430px] min-h-screen sm:min-h-[890px] bg-white sm:rounded-[40px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] flex flex-col relative z-10 overflow-hidden border-0 sm:border-8 sm:border-stone-800 transition-all duration-300">
+      {/* Responsive Screen Container */}
+      <main className="w-full max-w-full sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl min-h-screen sm:min-h-[92vh] sm:my-6 md:my-8 bg-white sm:rounded-[36px] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] flex flex-col relative z-10 overflow-hidden border-0 sm:border border-white/20 transition-all duration-300">
         
-        {/* Top App Header (exact matching phone mockup) */}
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-5 pt-4 pb-3 flex items-center justify-between border-b border-stone-100">
-          {/* Left: Back chevron button */}
-          <button
-            onClick={() => router.back()}
-            aria-label="Back"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-stone-700 hover:bg-stone-100 active:scale-90 transition-transform -ml-1"
-          >
-            <ChevronLeft size={22} strokeWidth={2.2} />
-          </button>
-
-          {/* Center: Restaurant Brand Name */}
-          <div className="text-center">
-            <span className="text-[12px] sm:text-[13px] font-medium tracking-wide text-stone-600 uppercase block">
-              {theme.brandName}
-            </span>
-            {rawTableNumber && (
-              <span
-                className="text-[10px] font-semibold tracking-wider uppercase"
-                style={{ color: theme.accent }}
-              >
-                Table {rawTableNumber}
+        {/* Top App Header (Responsive matching mobile & desktop) */}
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-5 sm:px-8 py-3.5 sm:py-4 flex items-center justify-between border-b border-stone-100">
+          {/* Left: Back chevron button + Brand & Table indicator */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => router.back()}
+              aria-label="Back"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-stone-700 hover:bg-stone-100 active:scale-90 transition-transform -ml-1"
+            >
+              <ChevronLeft size={22} strokeWidth={2.2} />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] sm:text-base font-bold tracking-wide text-stone-800 uppercase block">
+                {theme.brandName}
               </span>
-            )}
+              {rawTableNumber && (
+                <span
+                  className="text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider"
+                  style={{ color: theme.accent, backgroundColor: `${theme.accent}15` }}
+                >
+                  Table {rawTableNumber}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Right: Cart link with count badge */}
+          {/* Center (Desktop only): Section subtitle */}
+          <div className="hidden md:block text-center">
+            <span className="text-xs font-semibold tracking-[0.2em] text-stone-400 uppercase">
+              {theme.title}
+            </span>
+          </div>
+
+          {/* Right: Cart link with count badge & desktop subtotal */}
           <button
             onClick={() => setCartOpen(true)}
             aria-label="View Cart"
-            className="relative flex items-center gap-1.5 py-1 px-2.5 rounded-full hover:bg-stone-100 active:scale-95 transition"
+            className="relative flex items-center gap-2 py-1.5 px-3 sm:px-4 rounded-full border border-stone-200/80 hover:bg-stone-50 active:scale-95 transition shadow-xs"
           >
-            <span className="text-xs font-semibold text-stone-800 tracking-tight">
+            <ShoppingCart size={16} style={{ color: theme.accent }} />
+            <span className="text-xs sm:text-sm font-semibold text-stone-800 tracking-tight">
               Cart
             </span>
             {totalCount() > 0 && (
@@ -1162,48 +1271,59 @@ function CustomerMenuContent() {
                 {totalCount()}
               </span>
             )}
+            {totalCount() > 0 && (
+              <span
+                className="hidden sm:inline font-mono text-xs font-bold pl-1.5 border-l border-stone-200"
+                style={{ color: theme.accent }}
+              >
+                {formatPrice(subtotal())}
+              </span>
+            )}
           </button>
         </header>
 
-
-        {/* Section Heading & Subtle View Switcher */}
-        <div className="px-5 pt-2 pb-2 flex items-center justify-between">
-          <div className="w-14" />
-          <h1 className="text-xl sm:text-[22px] font-semibold tracking-[0.22em] text-[#374151] uppercase font-sans text-center">
-            {theme.title}
-          </h1>
+        {/* Section Heading & View Switcher */}
+        <div className="relative px-4 sm:px-8 pt-4 pb-3 flex items-center justify-between">
+          <div className="w-16 sm:w-24 shrink-0" />
+          <div className="text-center flex-1">
+            <h1 className="text-base sm:text-lg md:text-xl font-medium tracking-[0.22em] text-[#374151] uppercase font-sans">
+              {theme.title}
+            </h1>
+          </div>
           {/* Subtle View Switcher */}
-          <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded-lg shrink-0">
+          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl shrink-0">
             <button
               onClick={() => handleSetViewMode("cards")}
               aria-label="Card View"
               title="Card View"
               className={cn(
-                "p-1.5 rounded-md transition-all",
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
                 viewMode === "cards" ? "bg-white text-stone-900 shadow-xs" : "text-stone-400 hover:text-stone-700"
               )}
             >
               <LayoutGrid size={15} />
+              <span className="hidden sm:inline">Cards</span>
             </button>
             <button
               onClick={() => handleSetViewMode("list")}
               aria-label="List View"
               title="List View"
               className={cn(
-                "p-1.5 rounded-md transition-all",
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
                 viewMode === "list" ? "bg-white text-stone-900 shadow-xs" : "text-stone-400 hover:text-stone-700"
               )}
             >
               <Rows3 size={15} />
+              <span className="hidden sm:inline">List</span>
             </button>
           </div>
         </div>
 
         {/* The Exact Card View (matching user's attached staggered mockup) OR List View */}
         {viewMode === "cards" ? (
-          <div className="flex-1 overflow-y-auto px-4 pb-28 pt-8">
-            <div className="grid grid-cols-2 gap-3.5 sm:gap-4">
-              {/* Left Column (starts at normal offset) */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-8 pb-28 pt-8 sm:pt-10">
+            {/* Mobile (2-column staggered masonry matching user's photo) */}
+            <div className="grid grid-cols-2 gap-3.5 sm:gap-4 md:hidden">
               <div className="flex flex-col gap-9 sm:gap-10">
                 {itemsToRender
                   .filter((_, idx) => idx % 2 === 0)
@@ -1226,14 +1346,13 @@ function CustomerMenuContent() {
                         onClick={() => setModalItem({ item, imageUrl, patternId })}
                         onAddClick={(e) => {
                           e.stopPropagation();
-                          setModalItem({ item, imageUrl, patternId });
+                          addItem(item, 1);
                         }}
                       />
                     );
                   })}
               </div>
 
-              {/* Right Column (Staggered downwards by 46px matching mockup) */}
               <div className="flex flex-col gap-9 sm:gap-10 pt-11 sm:pt-12">
                 {itemsToRender
                   .filter((_, idx) => idx % 2 === 1)
@@ -1256,7 +1375,211 @@ function CustomerMenuContent() {
                         onClick={() => setModalItem({ item, imageUrl, patternId })}
                         onAddClick={(e) => {
                           e.stopPropagation();
-                          setModalItem({ item, imageUrl, patternId });
+                          addItem(item, 1);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Tablet (3-column staggered masonry) */}
+            <div className="hidden md:grid lg:hidden md:grid-cols-3 md:gap-5">
+              <div className="flex flex-col gap-10">
+                {itemsToRender
+                  .filter((_, idx) => idx % 3 === 0)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item, 1);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+              <div className="flex flex-col gap-10 pt-8">
+                {itemsToRender
+                  .filter((_, idx) => idx % 3 === 1)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item, 1);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+              <div className="flex flex-col gap-10 pt-14">
+                {itemsToRender
+                  .filter((_, idx) => idx % 3 === 2)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item, 1);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Desktop & Widescreen (4-column staggered masonry) */}
+            <div className="hidden lg:grid lg:grid-cols-4 lg:gap-6">
+              <div className="flex flex-col gap-10">
+                {itemsToRender
+                  .filter((_, idx) => idx % 4 === 0)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item, 1);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+              <div className="flex flex-col gap-10 pt-7">
+                {itemsToRender
+                  .filter((_, idx) => idx % 4 === 1)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item, 1);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+              <div className="flex flex-col gap-10 pt-14">
+                {itemsToRender
+                  .filter((_, idx) => idx % 4 === 2)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item, 1);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+              <div className="flex flex-col gap-10 pt-7">
+                {itemsToRender
+                  .filter((_, idx) => idx % 4 === 3)
+                  .map((item) => {
+                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
+                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                    const qty = inCart?.quantity || 0;
+                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
+                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
+
+                    return (
+                      <SushiCardItem
+                        key={item.id}
+                        item={item}
+                        imageUrl={imageUrl}
+                        patternId={patternId}
+                        theme={theme}
+                        qtyInCart={qty}
+                        onClick={() => setModalItem({ item, imageUrl, patternId })}
+                        onAddClick={(e) => {
+                          e.stopPropagation();
+                          addItem(item, 1);
                         }}
                       />
                     );
@@ -1265,60 +1588,60 @@ function CustomerMenuContent() {
             </div>
           </div>
         ) : (
-          /* List View (matching previous list mockup) */
-          <div className="flex-1 overflow-y-auto divide-y-0 px-1 pb-28 pt-1">
-            {itemsToRender.map((item, idx) => {
-              const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-              const qty = inCart?.quantity || 0;
-              const basePattern = BASE_PATTERN_NAMES[idx % BASE_PATTERN_NAMES.length];
-              const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-              const imageUrl = item.image_url || PLACEHOLDER_IMAGES[idx % PLACEHOLDER_IMAGES.length];
+          /* List View (Exact matching mockup: pristine white, no card box, exact spacing) */
+          <div className="flex-1 overflow-y-auto px-2 sm:px-6 lg:px-10 pb-28 pt-2 sm:pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 sm:gap-y-7 max-w-5xl mx-auto">
+              {itemsToRender.map((item, idx) => {
+                const inCart = cartItems.find((c) => c.menuItem.id === item.id);
+                const qty = inCart?.quantity || 0;
+                const basePattern = BASE_PATTERN_NAMES[idx % BASE_PATTERN_NAMES.length];
+                const patternId = `pat-${basePattern}${theme.patternSuffix}`;
+                const imageUrl = item.image_url || PLACEHOLDER_IMAGES[idx % PLACEHOLDER_IMAGES.length];
 
-              return (
-                <SushiListRow
-                  key={item.id}
-                  item={item}
-                  imageUrl={imageUrl}
-                  patternId={patternId}
-                  theme={theme}
-                  qtyInCart={qty}
-                  onClick={() => setModalItem({ item, imageUrl, patternId })}
-                  onAddClick={(e) => {
-                    e.stopPropagation();
-                    setModalItem({ item, imageUrl, patternId });
-                  }}
-                />
-              );
-            })}
+                return (
+                  <SushiListRow
+                    key={item.id}
+                    item={item}
+                    imageUrl={imageUrl}
+                    patternId={patternId}
+                    theme={theme}
+                    qtyInCart={qty}
+                    onClick={() => setModalItem({ item, imageUrl, patternId })}
+                    onAddClick={(e) => {
+                      e.stopPropagation();
+                      addItem(item, 1);
+                    }}
+                  />
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Floating Cart Button (when items in cart) */}
+        {/* Circular Floating Cart Button (FAB) */}
         <AnimatePresence>
           {totalCount() > 0 && !isCartOpen && (
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="absolute bottom-5 inset-x-5 z-30"
+            <motion.button
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 20 }}
+              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.08 }}
+              onClick={() => setCartOpen(true)}
+              aria-label="View Cart"
+              className="fixed bottom-6 right-6 w-16 h-16 z-50 rounded-full shadow-2xl flex items-center justify-center text-white transition-all duration-200 cursor-pointer"
+              style={{
+                backgroundColor: theme.accent,
+                boxShadow: `0 12px 30px -4px ${theme.accent}66, 0 6px 16px rgba(0,0,0,0.25)`,
+              }}
             >
-              <button
-                onClick={() => setCartOpen(true)}
-                className="w-full py-3.5 px-6 rounded-full text-white font-semibold text-sm shadow-xl flex items-center justify-between active:scale-[0.98] transition-all"
-                style={{ backgroundColor: theme.accent }}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center font-mono text-xs font-bold">
-                    {totalCount()}
-                  </span>
-                  <span>View Order</span>
-                </div>
-                <span className="font-mono text-base font-bold">
-                  {formatPrice(subtotal())}
-                </span>
-              </button>
-            </motion.div>
+              <ShoppingCart size={26} strokeWidth={2.3} />
+              {/* Notification Badge with Live Count */}
+              <span className="absolute -top-1 -right-1 min-w-[24px] h-6 px-1.5 bg-stone-900 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white shadow-md font-mono">
+                {totalCount()}
+              </span>
+            </motion.button>
           )}
         </AnimatePresence>
 
