@@ -444,9 +444,12 @@ export function CustomerStatusContent() {
     if (activeOrderId) {
       unsubscribeOrder = subscribeToCustomerOrder(activeOrderId, {
         onOrderUpdated: (updated) => {
-          setOrders((prev) =>
-            prev.map((o) => (o.id === activeOrderId ? { ...o, ...updated } : o))
-          );
+          if (updated && Object.keys(updated).length > 0) {
+            setOrders((prev) =>
+              prev.map((o) => (o.id === activeOrderId ? { ...o, ...updated } : o))
+            );
+          }
+          loadOrders(true);
         },
       });
     }
@@ -456,9 +459,12 @@ export function CustomerStatusContent() {
     if (resolvedTableId) {
       unsubscribeTable = subscribeToTableOrders(resolvedTableId, {
         onOrderUpdated: (updated) => {
-          setOrders((prev) =>
-            prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o))
-          );
+          if (updated && Object.keys(updated).length > 0) {
+            setOrders((prev) =>
+              prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o))
+            );
+          }
+          loadOrders(true);
         },
         onNewOrder: () => {
           loadOrders(true);

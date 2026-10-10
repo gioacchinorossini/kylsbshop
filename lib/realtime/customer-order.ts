@@ -1,5 +1,5 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabaseClient } from '../supabase/client';
+import { supabaseClient, isSupabaseConfigured } from '../supabase/client';
 import { Order } from '@/types/database';
 
 export interface CustomerOrderRealtimeHandlers {
@@ -9,14 +9,19 @@ export interface CustomerOrderRealtimeHandlers {
 
 /**
  * Subscribes to real-time UPDATE events for a single order row,
- * filtered by order `id`. Safe for customer-facing use — only listens,
- * never reads other orders.
+ * filtered by order `id`. Also listens to order_items changes to keep
+ * the customer receipt perfectly in sync.
  */
 export function subscribeToCustomerOrder(
   orderId: string,
   handlers: CustomerOrderRealtimeHandlers
 ): () => void {
-  if (!orderId) return () => {};
+  if (!orderId || !isSupabaseConfigured) {
+    if (handlers.onStatusChange && !isSupabaseConfigured) {
+      handlers.onStatusChange('CLOSED');
+    }
+    return () => {};
+  }
 
   const channel: RealtimeChannel = supabaseClient
     .channel(`customer-order-${orderId}`)
@@ -31,6 +36,20 @@ export function subscribeToCustomerOrder(
       (payload) => {
         if (handlers.onOrderUpdated && payload.new) {
           handlers.onOrderUpdated(payload.new as Partial<Order>);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'order_items',
+        filter: `order_id=eq.${orderId}`,
+      },
+      () => {
+        if (handlers.onOrderUpdated) {
+          handlers.onOrderUpdated({});
         }
       }
     );
@@ -59,7 +78,12 @@ export function subscribeToTableOrders(
   tableId: string,
   handlers: CustomerTableOrdersRealtimeHandlers
 ): () => void {
-  if (!tableId) return () => {};
+  if (!tableId || !isSupabaseConfigured) {
+    if (handlers.onStatusChange && !isSupabaseConfigured) {
+      handlers.onStatusChange('CLOSED');
+    }
+    return () => {};
+  }
 
   const channel: RealtimeChannel = supabaseClient
     .channel(`customer-table-${tableId}-${Date.now()}`)
@@ -100,4 +124,5 @@ export function subscribeToTableOrders(
     supabaseClient.removeChannel(channel);
   };
 }
+
 

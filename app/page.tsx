@@ -14,7 +14,7 @@ import {
 import { MenuItem, Order } from "@/types/database";
 import { getMenuItemsAction } from "@/app/actions/menu";
 import { getTablesAction } from "@/app/actions/tables";
-import { createOrderAction } from "@/app/actions/orders";
+import { createOrderAction, getOrdersByTableAction } from "@/app/actions/orders";
 import { useCartStore, Brand } from "@/lib/store/cart";
 
 function cn(...inputs: (string | undefined | null | false | 0 | Record<string, boolean>)[]): string {
@@ -793,78 +793,202 @@ function CartDrawer({
   );
 }
 
-// ─── Order Success Modal ─────────────────────────────────────────────────────
+// ─── Receipt Item type for submitted cart snapshot ───────────────────────────
+interface SubmittedReceiptItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  specialInstructions?: string;
+}
+
+// ─── Order Success Modal (Full Customer Receipt) ─────────────────────────────
 function OrderSuccessModal({
   order,
   tableNumber,
   theme,
+  submittedItems,
   onClose,
 }: {
   order: Order;
   tableNumber: string;
   theme: typeof THEMES[Brand];
+  submittedItems?: SubmittedReceiptItem[];
   onClose: () => void;
 }) {
+  // Build receipt line items: prefer server order_items, fallback to cart snapshot
+  const receiptItems: SubmittedReceiptItem[] = (() => {
+    if (order.order_items && order.order_items.length > 0) {
+      return order.order_items.map((oi) => ({
+        name: oi.menu_item_name,
+        quantity: oi.quantity,
+        unitPrice: Number(oi.unit_price),
+        subtotal: Number(oi.subtotal ?? oi.unit_price * oi.quantity),
+        specialInstructions: oi.special_instructions || undefined,
+      }));
+    }
+    if (submittedItems && submittedItems.length > 0) {
+      return submittedItems;
+    }
+    return [];
+  })();
+
+  const orderTime = order.created_at
+    ? new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="w-full max-w-sm rounded-[32px] bg-white overflow-hidden shadow-2xl p-7 text-center space-y-4"
+        initial={{ y: "100%", opacity: 0.5 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: "100%", opacity: 0 }}
+        transition={{ type: "spring", damping: 28, stiffness: 300 }}
+        className="w-full sm:max-w-sm bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
-          <CheckCircle size={28} />
+        {/* ── Receipt Header ───────────────────────────────── */}
+        <div className="shrink-0 px-6 pt-6 pb-4 text-center space-y-3 border-b border-stone-100">
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
+            <CheckCircle size={24} />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-stone-900">Order Received!</h3>
+            <p className="text-[11px] text-stone-400 mt-0.5">Your order has been sent to the kitchen</p>
+          </div>
+
+          <div className="flex items-center justify-between px-1">
+            <div className="text-left">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Order</p>
+              <p
+                className="text-xl font-black font-mono tracking-tight"
+                style={{ color: theme.accent }}
+              >
+                #{order.order_number}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                {tableNumber ? "Table" : "Time"}
+              </p>
+              {tableNumber ? (
+                <p className="text-xl font-black font-mono tracking-tight text-stone-800">
+                  {String(tableNumber).padStart(2, "0")}
+                </p>
+              ) : (
+                <p className="text-sm font-semibold text-stone-600">{orderTime}</p>
+              )}
+            </div>
+          </div>
+
+          {tableNumber && (
+            <p className="text-[11px] text-stone-400">
+              Placed at {orderTime}
+            </p>
+          )}
         </div>
 
-        <div>
-          <h3 className="text-xl font-bold text-stone-900">Order Received!</h3>
-          <p className="text-xs text-stone-500 mt-1">Your order has been sent to the kitchen.</p>
+        {/* ── Scrollable Receipt Items ────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {receiptItems.length > 0 ? (
+            <div className="space-y-0 divide-y divide-stone-100">
+              {receiptItems.map((item, idx) => (
+                <div key={idx} className="flex items-baseline justify-between gap-3 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-stone-800">
+                      <span
+                        className="font-mono font-bold mr-1.5 text-[13px]"
+                        style={{ color: theme.accent }}
+                      >
+                        {item.quantity}×
+                      </span>
+                      {item.name}
+                    </p>
+                    {item.specialInstructions && (
+                      <p className="text-[11px] text-stone-400 italic mt-0.5 pl-5">
+                        ↳ {item.specialInstructions}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-mono font-semibold text-stone-700">
+                      {formatPrice(item.subtotal)}
+                    </p>
+                    {item.quantity > 1 && (
+                      <p className="text-[10px] text-stone-400 font-mono">
+                        {formatPrice(item.unitPrice)} ea
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-4 text-sm text-stone-400 text-center">Order submitted successfully.</p>
+          )}
         </div>
 
-        <div className="rounded-2xl bg-stone-50 border border-stone-100 p-4 space-y-1">
-          <p className="text-xs text-stone-400">Order Number</p>
-          <p
-            className="text-2xl font-bold font-mono tracking-wider"
-            style={{ color: theme.accent }}
+        {/* ── Receipt Footer: Total & Actions ────────────── */}
+        <div className="shrink-0 px-6 pt-4 pb-7 bg-stone-50/80 border-t border-stone-100 space-y-4">
+          {/* Total */}
+          <div className="flex items-baseline justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-stone-400">
+              Total
+            </span>
+            <span
+              className="text-2xl font-black font-mono tracking-tight"
+              style={{ color: theme.accent }}
+            >
+              {formatPrice(order.total_amount)}
+            </span>
+          </div>
+
+          {/* Cashier instruction */}
+          <div
+            className="rounded-xl px-4 py-2.5 text-center border"
+            style={{
+              backgroundColor: `${theme.accent}08`,
+              borderColor: `${theme.accent}25`,
+            }}
           >
-            #{order.order_number}
-          </p>
-          <p className="text-sm font-semibold font-mono text-stone-700">
-            {formatPrice(order.total_amount)}
-          </p>
-        </div>
-
-        {tableNumber && (
-          <div className="rounded-xl bg-amber-50/70 border border-amber-200/60 px-4 py-2.5 text-center">
-            <p className="text-xs text-amber-800">
-              Assigned to <span className="font-bold">Table {tableNumber}</span>
+            <p className="text-[12px] font-medium text-stone-600 leading-snug">
+              {tableNumber ? (
+                <>
+                  State <strong>Table {String(tableNumber).padStart(2, "0")}</strong> &amp; Order{" "}
+                  <strong>#{order.order_number}</strong> at the cashier when paying.
+                </>
+              ) : (
+                <>
+                  State Order <strong>#{order.order_number}</strong> at the cashier counter when paying.
+                </>
+              )}
             </p>
           </div>
-        )}
 
-        {/* CTA Buttons */}
-        <div className="space-y-2.5 pt-2">
-          <Link
-            href={`/status?order=${order.id}${tableNumber ? `&table=${encodeURIComponent(tableNumber)}` : ""}`}
-            className="w-full py-3.5 rounded-full text-white text-sm font-semibold transition flex items-center justify-center gap-2 shadow-md"
-            style={{ backgroundColor: theme.accent }}
-          >
-            <ReceiptText size={16} />
-            Track Order Status
-          </Link>
-          <button
-            onClick={onClose}
-            className="w-full py-3 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition"
-          >
-            Order More
-          </button>
+          {/* CTA Buttons */}
+          <div className="space-y-2.5">
+            <Link
+              href={`/status?order=${order.id}${tableNumber ? `&table=${encodeURIComponent(tableNumber)}` : ""}`}
+              className="w-full py-3.5 rounded-full text-white text-sm font-semibold transition flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
+              style={{ backgroundColor: theme.accent }}
+            >
+              <ReceiptText size={16} />
+              Track Order Status
+            </Link>
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition active:scale-[0.98]"
+            >
+              Order More
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
@@ -973,6 +1097,7 @@ function CustomerMenuContent() {
 
   const [isPending, startTransition] = useTransition();
   const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
+  const [submittedReceiptItems, setSubmittedReceiptItems] = useState<SubmittedReceiptItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasActiveOrders, setHasActiveOrders] = useState<boolean>(false);
 
@@ -1008,17 +1133,43 @@ function CustomerMenuContent() {
     loadData();
   }, [rawTableNumber, tableParam]);
 
-  // Check active orders in localStorage
+  // Check active orders in table and localStorage
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem("@kyle_pos_my_orders");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) setHasActiveOrders(true);
+    async function checkActive() {
+      if (rawTableNumber) {
+        try {
+          const res = await getOrdersByTableAction(rawTableNumber);
+          if (res.success && res.data && res.data.length > 0) {
+            const hasActive = res.data.some((o) =>
+              ["pending", "preparing", "ready"].includes(o.status)
+            );
+            if (hasActive) {
+              setHasActiveOrders(true);
+              return;
+            }
+          }
+        } catch {}
       }
-    } catch {}
-  }, []);
+
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("@kyle_pos_my_orders");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setHasActiveOrders(true);
+              return;
+            }
+          }
+          const lastOrder = localStorage.getItem("kyles_last_order_id");
+          if (lastOrder) {
+            setHasActiveOrders(true);
+          }
+        } catch {}
+      }
+    }
+    checkActive();
+  }, [rawTableNumber]);
 
   // Filter items by brand
   const filteredItems = menuItems.filter((i) => {
@@ -1062,6 +1213,15 @@ function CustomerMenuContent() {
     if (cartItems.length === 0) return;
     setErrorMessage(null);
     startTransition(async () => {
+      // Capture a snapshot of items for the customer receipt
+      const receiptSnapshot: SubmittedReceiptItem[] = cartItems.map((c) => ({
+        name: c.menuItem.name,
+        quantity: c.quantity,
+        unitPrice: Number(c.menuItem.price),
+        subtotal: +(Number(c.menuItem.price) * c.quantity).toFixed(2),
+        specialInstructions: c.specialInstructions || undefined,
+      }));
+
       const payload = {
         table_id: selectedTableId || undefined,
         customer_name: rawTableNumber ? "Table " + rawTableNumber + " Guest" : "Guest",
@@ -1076,11 +1236,13 @@ function CustomerMenuContent() {
       const result = await createOrderAction(payload);
       if (result.success && result.data) {
         const placed = result.data;
+        setSubmittedReceiptItems(receiptSnapshot);
         if (typeof window !== "undefined") {
           try {
             localStorage.setItem("kyles_last_order_id", placed.id);
             if (rawTableNumber) {
               localStorage.setItem(`kyles_table_${rawTableNumber}_last_order`, placed.id);
+              localStorage.setItem("kyles_current_table", rawTableNumber);
             }
             const rawMyOrders = localStorage.getItem("@kyle_pos_my_orders");
             const parsedMyOrders = rawMyOrders ? JSON.parse(rawMyOrders) : [];
@@ -1145,24 +1307,42 @@ function CustomerMenuContent() {
             )}
           </div>
 
-          {/* Right: Cart link with count badge */}
-          <button
-            onClick={() => setCartOpen(true)}
-            aria-label="View Cart"
-            className="relative flex items-center gap-1.5 py-1 px-2.5 rounded-full hover:bg-stone-100 active:scale-95 transition"
-          >
-            <span className="text-xs font-semibold text-stone-800 tracking-tight">
-              Cart
-            </span>
-            {totalCount() > 0 && (
-              <span
-                className="w-5 h-5 text-white text-[11px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
-                style={{ backgroundColor: theme.accent }}
-              >
-                {totalCount()}
+          {/* Right: Receipt tracker connector & Cart */}
+          <div className="flex items-center gap-0.5">
+            <Link
+              href={
+                rawTableNumber
+                  ? `/status?table=${encodeURIComponent(rawTableNumber)}`
+                  : `/status`
+              }
+              aria-label="Order Receipt & Status"
+              title="View Digital Receipt"
+              className="relative p-1.5 rounded-full text-stone-700 hover:bg-stone-100 active:scale-90 transition"
+            >
+              <ReceiptText size={20} strokeWidth={1.8} />
+              {hasActiveOrders && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+              )}
+            </Link>
+
+            <button
+              onClick={() => setCartOpen(true)}
+              aria-label="View Cart"
+              className="relative flex items-center gap-1.5 py-1 px-2.5 rounded-full hover:bg-stone-100 active:scale-95 transition"
+            >
+              <span className="text-xs font-semibold text-stone-800 tracking-tight">
+                Cart
               </span>
-            )}
-          </button>
+              {totalCount() > 0 && (
+                <span
+                  className="w-5 h-5 text-white text-[11px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  {totalCount()}
+                </span>
+              )}
+            </button>
+          </div>
         </header>
 
 
@@ -1375,7 +1555,11 @@ function CustomerMenuContent() {
               order={orderSuccess}
               tableNumber={rawTableNumber}
               theme={theme}
-              onClose={() => setOrderSuccess(null)}
+              submittedItems={submittedReceiptItems}
+              onClose={() => {
+                setOrderSuccess(null);
+                setSubmittedReceiptItems([]);
+              }}
             />
           )}
         </AnimatePresence>
