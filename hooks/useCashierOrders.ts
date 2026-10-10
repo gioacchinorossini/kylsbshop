@@ -10,6 +10,8 @@ import {
   archiveTableOrdersAction,
   unarchiveOrderAction,
   getArchivedOrdersAction,
+  batchCompleteOrdersAction,
+  completeOrderWithPaymentAction,
 } from '@/app/actions/orders';
 import { playOrderChime } from '@/lib/audio/chime';
 
@@ -92,6 +94,46 @@ export function useCashierOrders() {
     );
 
     const result = await updateOrderStatusAction(orderId, 'completed');
+    if (!result.success) {
+      fetchAllOrders(true);
+      return { success: false, error: result.error };
+    }
+    return { success: true };
+  };
+
+  // "Accept & Pay All" for table -> status = 'completed' for all order IDs
+  const acceptAndMarkPaidBatch = async (orderIds: string[]) => {
+    if (!orderIds || orderIds.length === 0) return { success: true };
+    const idSet = new Set(orderIds);
+    setOrders((prev) =>
+      prev.map((o) => (idSet.has(o.id) ? { ...o, status: 'completed' } : o))
+    );
+
+    const result = await batchCompleteOrdersAction(orderIds);
+    if (!result.success) {
+      fetchAllOrders(true);
+      return { success: false, error: result.error };
+    }
+    return { success: true };
+  };
+
+  // "Complete Payment with Tender Details"
+  const completePaymentBatch = async (
+    orderIds: string[],
+    paymentDetails: {
+      payment_method: 'cash' | 'gcash';
+      amount_paid: number;
+      change_given: number;
+      reference_number?: string;
+    }
+  ) => {
+    if (!orderIds || orderIds.length === 0) return { success: true };
+    const idSet = new Set(orderIds);
+    setOrders((prev) =>
+      prev.map((o) => (idSet.has(o.id) ? { ...o, status: 'completed' } : o))
+    );
+
+    const result = await completeOrderWithPaymentAction(orderIds, paymentDetails);
     if (!result.success) {
       fetchAllOrders(true);
       return { success: false, error: result.error };
@@ -191,6 +233,8 @@ export function useCashierOrders() {
     connectionStatus,
     refreshOrders: () => fetchAllOrders(false),
     acceptAndMarkPaid,
+    acceptAndMarkPaidBatch,
+    completePaymentBatch,
     cancelOrder,
     archiveOrder,
     archiveTableOrders,

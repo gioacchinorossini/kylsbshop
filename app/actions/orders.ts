@@ -97,81 +97,23 @@ export async function createOrderAction(
       };
     });
 
-    const totalAmount = +lineItems.reduce((s, i) => s + i.subtotal, 0).toFixed(2);
+    const packagingFee = Number(input.packaging_fee || 0);
+    const calculatedItemsTotal = +lineItems.reduce((s, i) => s + i.subtotal, 0).toFixed(2);
+    const grandTotal = +(calculatedItemsTotal + packagingFee).toFixed(2);
+    const totalAmount = grandTotal;
 
     // ── determine table_id ──
-    const tableId = input.table_id && isUUID(input.table_id) ? input.table_id : null;
-
-    // ── Check if table already has an active order to STACK ONTO 1 RECEIPT ──
-    let existingOrderId: string | null = null;
-    let existingOrderRow: any = null;
-
-    if (tableId) {
-      const { data: existingActive } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('table_id', tableId)
-        .in('status', ['pending', 'preparing', 'ready'])
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (existingActive && existingActive.length > 0) {
-        existingOrderRow = existingActive[0];
-        existingOrderId = existingOrderRow.id;
-      }
-    } else if (input.customer_notes) {
-      const cleanNote = input.customer_notes.trim();
-      const { data: existingActive } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .ilike('customer_notes', cleanNote)
-        .in('status', ['pending', 'preparing', 'ready'])
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (existingActive && existingActive.length > 0) {
-        existingOrderRow = existingActive[0];
-        existingOrderId = existingOrderRow.id;
-      }
+    let tableId = input.table_id && isUUID(input.table_id) ? input.table_id : null;
+    if (!tableId && input.table_number) {
+      const { data: tableRow } = await supabase
+        .from('dining_tables')
+        .select('id')
+        .eq('table_number', input.table_number)
+        .maybeSingle();
+      if (tableRow?.id) tableId = tableRow.id;
     }
 
-    // ── IF ACTIVE ORDER EXISTS: STACK NEW ITEMS ONTO THE EXISTING RECEIPT ──
-    if (existingOrderId && existingOrderRow) {
-      const newItemsToInsert = lineItems.map((li) => ({
-        ...li,
-        order_id: existingOrderId,
-      }));
-
-      await supabase.from('order_items').insert(newItemsToInsert);
-
-      const newTotal = +(Number(existingOrderRow.total_amount || 0) + totalAmount).toFixed(2);
-      const { data: updatedOrder } = await supabase
-        .from('orders')
-        .update({
-          total_amount: newTotal,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingOrderId)
-        .select('*, dining_tables(*), order_items(*)')
-        .single();
-
-      revalidatePath('/');
-      revalidatePath('/pos');
-      revalidatePath('/orders');
-      revalidatePath('/status');
-
-      if (updatedOrder) {
-        const orderData: Order = {
-          ...updatedOrder,
-          dining_table: Array.isArray(updatedOrder.dining_tables)
-            ? (updatedOrder.dining_tables[0] as DiningTable | null) ?? null
-            : (updatedOrder.dining_tables as DiningTable | null) ?? null,
-        } as Order;
-        return { success: true, data: orderData };
-      }
-    }
-
-    // ── FIRST ORDER FOR TABLE: insert new order row ──
+    // ── insert new order row ──
     const { data: orderRow, error: orderErr } = await supabase
       .from('orders')
       .insert({
@@ -179,7 +121,8 @@ export async function createOrderAction(
         table_id: tableId,
         order_type: input.order_type || 'dine_in',
         status: 'pending' as OrderStatus,
-        total_amount: totalAmount,
+        total_amount: grandTotal,
+        packaging_fee: packagingFee,
         customer_name: input.customer_name || 'Guest',
         customer_notes: input.customer_notes || null,
       })
@@ -199,6 +142,7 @@ export async function createOrderAction(
           order_type: input.order_type || 'dine_in',
           status: 'pending',
           total_amount: totalAmount,
+          packaging_fee: packagingFee,
           customer_name: input.customer_name || 'Guest',
           customer_notes: input.customer_notes || null,
           created_at: now,
@@ -467,24 +411,18 @@ export async function getOrdersByTableAction(
     // Exclude archived orders so new customer doesn't see old customer's orders
     const nonArchivedOrders = orders.filter((o) => o.status !== 'Archived' && o.status !== 'archived');
 
-    // Ensure 1 unified receipt per table by stacking all active order items together
-    const activeOrders = nonArchivedOrders.filter((o) => ['pending', 'preparing', 'ready'].includes(o.status));
-    if (activeOrders.length > 0) {
-      const primary = activeOrders[0];
-      // Collect all stacked items
-      const allItems = activeOrders.flatMap((o) => o.order_items || []);
-      const totalAmount = +activeOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0).toFixed(2);
-      const stackedReceipt: Order = {
-        ...primary,
-        total_amount: totalAmount,
-        order_items: allItems,
-      };
-      return { success: true, data: [stackedReceipt] };
-    }
-
-    // If there are non-archived orders (e.g. recently completed and not yet archived by cashier)
     if (nonArchivedOrders.length > 0) {
-      return { success: true, data: nonArchivedOrders.slice(0, 1) };
+      const latestOrderTime = Math.max(...nonArchivedOrders.map((o) => new Date(o.created_at).getTime()));
+      const twoHoursMs = 2 * 60 * 60 * 1000;
+      const currentSessionOrders = nonArchivedOrders.filter((o) => {
+        const t = new Date(o.created_at).getTime();
+        return latestOrderTime - t <= twoHoursMs;
+      });
+
+      return {
+        success: true,
+        data: currentSessionOrders.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+      };
     }
 
     // All orders for this table are archived -> clear table for new customer
@@ -645,4 +583,100 @@ export async function cancelOrderAction(
 ): Promise<ActionResponse<Order>> {
   return updateOrderStatusAction(orderId, 'cancelled');
 }
+
+// ═══════════════════════════════════════════════════════════════
+// batchCompleteOrdersAction (Accept & Pay all orders for a table)
+// ═══════════════════════════════════════════════════════════════
+export async function batchCompleteOrdersAction(
+  orderIds: string[]
+): Promise<ActionResponse<{ count: number }>> {
+  try {
+    if (!orderIds || orderIds.length === 0) {
+      return { success: false, error: 'No order IDs provided.' };
+    }
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .in('id', orderIds)
+      .select('id');
+
+    if (error) {
+      console.warn('[batchCompleteOrdersAction]', error.message);
+      return { success: false, error: 'Could not complete orders.' };
+    }
+
+    revalidatePath('/pos');
+    revalidatePath('/kitchen');
+    revalidatePath('/orders');
+    revalidatePath('/status');
+    return { success: true, data: { count: data?.length || 0 } };
+  } catch (err) {
+    console.error('[batchCompleteOrdersAction] error:', err);
+    return { success: false, error: 'Unexpected server error.' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// completeOrderWithPaymentAction (Quick-Cash & Tender Change Settlement)
+// ═══════════════════════════════════════════════════════════════
+export async function completeOrderWithPaymentAction(
+  orderIds: string[],
+  paymentDetails: {
+    payment_method: 'cash' | 'gcash';
+    amount_paid: number;
+    change_given: number;
+    reference_number?: string;
+  }
+): Promise<ActionResponse<{ count: number }>> {
+  try {
+    if (!orderIds || orderIds.length === 0) {
+      return { success: false, error: 'No order IDs provided.' };
+    }
+    const supabase = createServerSupabaseClient();
+
+    const payload: Record<string, any> = {
+      status: 'completed',
+      payment_method: paymentDetails.payment_method,
+      amount_paid: paymentDetails.amount_paid,
+      change_given: paymentDetails.change_given,
+      updated_at: new Date().toISOString(),
+    };
+
+    let { data, error } = await supabase
+      .from('orders')
+      .update(payload)
+      .in('id', orderIds)
+      .select('id');
+
+    if (error && (error.code === 'PGRST204' || error.message?.includes('schema cache'))) {
+      const fallbackPayload: Record<string, any> = {
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+      };
+      const fallbackRes = await supabase
+        .from('orders')
+        .update(fallbackPayload)
+        .in('id', orderIds)
+        .select('id');
+      error = fallbackRes.error;
+      data = fallbackRes.data;
+    }
+
+    if (error) {
+      console.warn('[completeOrderWithPaymentAction]', error.message);
+      return { success: false, error: 'Could not complete orders.' };
+    }
+
+    revalidatePath('/pos');
+    revalidatePath('/kitchen');
+    revalidatePath('/orders');
+    revalidatePath('/status');
+    return { success: true, data: { count: data?.length || 0 } };
+  } catch (err) {
+    console.error('[completeOrderWithPaymentAction] error:', err);
+    return { success: false, error: 'Unexpected server error.' };
+  }
+}
+
 

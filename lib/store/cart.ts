@@ -35,19 +35,25 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   addItem: (menuItem, quantity = 1, specialInstructions = "") =>
     set((state) => {
-      const existing = state.items.find((c) => c.menuItem.id === menuItem.id);
-      if (existing) {
-        return {
-          items: state.items.map((c) =>
-            c.menuItem.id === menuItem.id
-              ? {
-                  ...c,
-                  quantity: c.quantity + quantity,
-                  specialInstructions: specialInstructions || c.specialInstructions,
-                }
-              : c
-          ),
+      const targetId = String(menuItem.id).trim();
+      const existingIndex = state.items.findIndex(
+        (c) => String(c.menuItem.id).trim() === targetId
+      );
+      if (existingIndex >= 0) {
+        const updated = [...state.items];
+        const existing = updated[existingIndex];
+        const mergedInstructions = specialInstructions
+          ? existing.specialInstructions && existing.specialInstructions !== specialInstructions
+            ? `${existing.specialInstructions}, ${specialInstructions}`
+            : specialInstructions
+          : existing.specialInstructions;
+
+        updated[existingIndex] = {
+          ...existing,
+          quantity: existing.quantity + quantity,
+          specialInstructions: mergedInstructions,
         };
+        return { items: updated };
       }
       return { items: [...state.items, { menuItem, quantity, specialInstructions }] };
     }),

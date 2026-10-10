@@ -8,10 +8,9 @@ import { twMerge } from "tailwind-merge";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ChevronLeft, Plus, Minus, X, ShoppingCart, CheckCircle,
-  ReceiptText, LayoutGrid, Rows3
+  Plus, Minus, X, ShoppingCart, Loader2, ReceiptText
 } from "lucide-react";
-import { MenuItem, Order } from "@/types/database";
+import { MenuItem } from "@/types/database";
 import { getMenuItemsAction } from "@/app/actions/menu";
 import { getTablesAction } from "@/app/actions/tables";
 import { createOrderAction, getOrdersByTableAction } from "@/app/actions/orders";
@@ -77,22 +76,22 @@ const THEMES = {
   "batchoy-shop": {
     brandName: "Batchoy Shop",
     title: "BATCHOY SHOP",
-    bgPattern: "/images/sushi/japanese_pattern.jpg",
-    bgColor: "#560c12",
-    accent: "#8d2d2b",
-    accentHover: "#762423",
-    accentBg: "bg-[#8d2d2b]",
-    accentHoverBg: "hover:bg-[#762423]",
-    accentText: "text-[#8d2d2b]",
-    accentBorder: "border-[#8d2d2b]",
-    accentShadow: "shadow-[#8d2d2b]/30",
+    bgPattern: "",
+    bgColor: "#09090b",
+    accent: "#ef4444",
+    accentHover: "#dc2626",
+    accentBg: "bg-red-600",
+    accentHoverBg: "hover:bg-red-700",
+    accentText: "text-red-500",
+    accentBorder: "border-red-500",
+    accentShadow: "shadow-red-500/30",
     patternSuffix: "-red",
   },
   "kyles-eatery": {
     brandName: "Kyle's Eatery",
     title: "KYLE'S EATERY",
-    bgPattern: "/images/sushi/japanese_pattern_orange.jpg",
-    bgColor: "#852d05",
+    bgPattern: "",
+    bgColor: "#ffffff",
     accent: "#ea580c",
     accentHover: "#c2410c",
     accentBg: "bg-[#ea580c]",
@@ -397,175 +396,84 @@ function MockupMinusButton({
   );
 }
 
-// ─── Exact List Row Component (Matching user image) ─────────────────────────
-function SushiListRow({
+// ─── Modern Food Card with In-Card Quantity Stepper ──────────────────────────
+function ModernFoodCardItem({
   item,
   imageUrl,
-  patternId,
-  theme,
+  isDark = false,
   qtyInCart,
+  onIncrement,
+  onDecrement,
   onClick,
-  onAddClick,
 }: {
   item: MenuItem;
   imageUrl: string;
-  patternId: string;
-  theme: typeof THEMES[Brand];
+  isDark?: boolean;
   qtyInCart: number;
+  onIncrement: (e: React.MouseEvent) => void;
+  onDecrement: (e: React.MouseEvent) => void;
   onClick: () => void;
-  onAddClick: (e: React.MouseEvent) => void;
 }) {
   return (
     <div
       onClick={onClick}
-      className="group relative flex items-center justify-between py-2 sm:py-3 px-1 sm:px-2 cursor-pointer select-none transition-all active:opacity-85"
+      className="group cursor-pointer bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-200 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md"
     >
-      {/* Left: Medallion with Dish Overlap */}
-      <div className="relative flex items-center shrink-0 w-[84px] h-[84px] sm:w-[92px] sm:h-[92px] -ml-1 sm:ml-0">
-        {/* Japanese Patterned Circle */}
-        <svg
-          width="80"
-          height="80"
-          viewBox="0 0 80 80"
-          className="rounded-full shadow-inner shrink-0 sm:w-[88px] sm:h-[88px]"
-        >
-          <circle cx="40" cy="40" r="40" fill={`url(#${patternId})`} />
-        </svg>
-
-        {/* Food image floating in front, slightly offset to the right and bottom */}
-        <div
-          className="absolute -right-1 top-2 w-[74px] h-[74px] sm:w-[82px] sm:h-[82px] pointer-events-none transition-transform duration-300 group-hover:scale-105"
-          style={{
-            filter: "drop-shadow(4px 8px 12px rgba(0, 0, 0, 0.28))",
-          }}
-        >
-          <Image
-            src={imageUrl}
-            alt={item.name}
-            width={88}
-            height={88}
-            className="w-full h-full object-contain"
-            priority
-          />
-        </div>
-      </div>
-
-      {/* Middle: Name & Price */}
-      <div className="flex-1 min-w-0 pl-4 sm:pl-5 pr-2 flex flex-col justify-center">
-        {/* Title in soft slate gray matching mockup */}
-        <h3 className="text-[16px] sm:text-[17px] font-medium text-[#52525b] tracking-normal leading-snug truncate">
-          {item.name}
-        </h3>
-
-        {/* Price in Brand Accent Color */}
-        <span
-          className="text-[18px] sm:text-[19px] font-bold tracking-tight leading-none mt-1 font-sans transition-colors"
-          style={{ color: theme.accent }}
-        >
-          {formatPrice(item.price)}
-        </span>
-      </div>
-
-      {/* Right: Circular Plus (+) Button in Brand Accent */}
-      <div className="flex items-center gap-2 shrink-0 pr-1 sm:pr-2">
-        {qtyInCart > 0 && (
-          <span
-            className="w-5 h-5 text-white text-[11px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
-            style={{ backgroundColor: theme.accent }}
-          >
-            {qtyInCart}
-          </span>
-        )}
-
-        <MockupPlusButton
-          onClick={onAddClick}
-          color={theme.accent}
-          ariaLabel={`Add ${item.name} to cart`}
-          size={36}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ─── Exact Staggered Card View Component (Matching user image) ──────────────
-function SushiCardItem({
-  item,
-  imageUrl,
-  patternId,
-  theme,
-  qtyInCart,
-  onClick,
-  onAddClick,
-}: {
-  item: MenuItem;
-  imageUrl: string;
-  patternId: string;
-  theme: typeof THEMES[Brand];
-  qtyInCart: number;
-  onClick: () => void;
-  onAddClick: (e: React.MouseEvent) => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className="group relative bg-white rounded-[26px] shadow-[0_12px_28px_-6px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_35px_-8px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 border border-stone-100/70 pt-[72px] sm:pt-[78px] pb-4 sm:pb-5 px-3 sm:px-4 flex flex-col items-center cursor-pointer select-none transition-all duration-300 active:scale-[0.98]"
-    >
-      {/* Overflowing Japanese Pattern Medallion */}
-      <div className="absolute -top-7 sm:-top-8 left-1/2 -translate-x-1/2 w-[84px] h-[84px] sm:w-[92px] sm:h-[92px] rounded-full overflow-hidden shadow-xs pointer-events-none transition-transform duration-300 group-hover:scale-105">
-        <svg className="w-full h-full" viewBox="0 0 84 84">
-          <circle cx="42" cy="42" r="42" fill={`url(#${patternId})`} />
-        </svg>
-      </div>
-
-      {/* Overflowing Food Cutout Image with Realistic Drop Shadow */}
-      <div
-        className="absolute -top-4 sm:-top-5 left-1/2 -translate-x-1/2 w-[80px] h-[80px] sm:w-[88px] sm:h-[88px] pointer-events-none transition-transform duration-300 group-hover:scale-110 flex items-center justify-center"
-        style={{
-          filter: "drop-shadow(4px 10px 10px rgba(0, 0, 0, 0.32))",
-        }}
-      >
+      {/* Top Image Area: Rounded rectangular banner */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800/50 flex items-center justify-center p-3">
         <Image
           src={imageUrl}
           alt={item.name}
-          width={92}
-          height={92}
-          className="w-full h-full object-contain"
-          priority
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          className="object-contain p-2 transition-transform duration-300 ease-out group-hover:scale-105"
         />
       </div>
 
-      {/* Cart quantity badge if already in cart */}
-      {qtyInCart > 0 && (
-        <span
-          className="absolute top-2.5 right-2.5 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
-          style={{ backgroundColor: theme.accent }}
-        >
-          {qtyInCart}
-        </span>
-      )}
+      {/* Card Body & Footer */}
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between flex-1 gap-2.5">
+        <div>
+          <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 line-clamp-1 leading-snug">
+            {item.name}
+          </h3>
+          <p className="font-semibold text-sm text-orange-600 dark:text-red-500 mt-0.5">
+            {formatPrice(item.price)}
+          </p>
+        </div>
 
-      {/* Item Title */}
-      <h3 className="text-[14px] sm:text-[15px] font-medium text-[#52525b] text-center truncate w-full px-1 mt-1 leading-snug">
-        {item.name}
-      </h3>
-
-      {/* Item Price */}
-      <p
-        className="text-[15px] sm:text-[16px] font-bold text-center mt-0.5 tracking-tight font-sans transition-colors"
-        style={{ color: theme.accent }}
-      >
-        {formatPrice(item.price)}
-      </p>
-
-      {/* Circular Plus (+) Button matching mockup */}
-      <MockupPlusButton
-        onClick={onAddClick}
-        color={theme.accent}
-        ariaLabel={`Add ${item.name} to cart`}
-        size={36}
-        className="mt-2.5 mb-0.5"
-      />
+        {/* Footer: Stepper or Plus Button */}
+        <div className="flex items-center justify-end pt-1" onClick={(e) => e.stopPropagation()}>
+          {qtyInCart === 0 ? (
+            <button
+              onClick={onIncrement}
+              aria-label={`Add ${item.name} to cart`}
+              className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-white transition-colors shrink-0 active:scale-90"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full shrink-0">
+              <button
+                onClick={onDecrement}
+                aria-label={`Decrease quantity of ${item.name}`}
+                className="p-0.5 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 transition-transform"
+              >
+                <Minus className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white" />
+              </button>
+              <span className="text-xs font-bold text-zinc-900 dark:text-white px-1 font-mono">
+                {qtyInCart}
+              </span>
+              <button
+                onClick={onIncrement}
+                aria-label={`Increase quantity of ${item.name}`}
+                className="p-0.5 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 transition-transform"
+              >
+                <Plus className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -600,9 +508,11 @@ function ItemDetailModal({
   };
 
   const handleSubmit = () => {
-    onAddToCart(item, qty, instructions);
+    onAddToCart(item, qty, instructions.trim());
     onClose();
   };
+
+  const totalPrice = Number(item.price) * qty;
 
   return (
     <motion.div
@@ -610,30 +520,33 @@ function ItemDetailModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        transition={{ type: "spring", damping: 26, stiffness: 320 }}
-        className="w-full max-w-[340px] sm:max-w-sm bg-white rounded-[32px] overflow-hidden shadow-2xl relative flex flex-col items-center"
+        initial={{ y: "100%", opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: "100%", opacity: 0 }}
+        transition={{ type: "spring", damping: 30, stiffness: 320 }}
+        className="fixed inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 w-full sm:max-w-md bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl shadow-2xl relative flex flex-col border border-zinc-200 dark:border-zinc-800 max-h-[92dvh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Grab Handle */}
+        <div className="w-10 h-1 rounded-full bg-zinc-200 dark:bg-zinc-700 mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+
         {/* Close Button */}
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-stone-700 flex items-center justify-center shadow-md backdrop-blur-sm transition-transform active:scale-90"
+          className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 flex items-center justify-center transition-colors"
         >
-          <X size={18} strokeWidth={2.2} />
+          <X className="w-4 h-4" />
         </button>
 
         {/* Top Japanese Arch Graphic with Dish Image */}
         <div className="relative pt-6 pb-2 px-6 flex flex-col items-center justify-center w-full">
           {/* Circular/Arch patterned backdrop */}
-          <div className="relative w-44 h-44 rounded-full overflow-hidden shadow-lg border-2 border-stone-200/50 flex items-center justify-center">
+          <div className="relative w-44 h-44 rounded-full overflow-hidden shadow-lg border-2 border-stone-200/50 dark:border-zinc-800 flex items-center justify-center">
             <svg width="176" height="176" viewBox="0 0 176 176" className="w-full h-full">
               <circle cx="88" cy="88" r="88" fill={`url(#${patternId})`} />
             </svg>
@@ -643,9 +556,7 @@ function ItemDetailModal({
           {/* Food image floating directly above arch */}
           <div
             className="absolute top-8 w-36 h-36 flex items-center justify-center pointer-events-none"
-            style={{
-              filter: "drop-shadow(4px 8px 16px rgba(0, 0, 0, 0.32))",
-            }}
+            style={{ filter: "drop-shadow(4px 8px 16px rgba(0, 0, 0, 0.32))" }}
           >
             <Image
               src={imageUrl}
@@ -661,72 +572,61 @@ function ItemDetailModal({
         {/* Content Section */}
         <div className="w-full px-6 pt-3 pb-8 flex flex-col items-center text-center space-y-4">
           <div>
-            <h3 className="text-xl font-bold text-stone-900 tracking-tight">
+            <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
               {item.name}
             </h3>
-            <p
-              className="text-sm font-bold mt-0.5 font-sans"
-              style={{ color: theme.accent }}
-            >
+            <p className="text-sm font-bold mt-0.5" style={{ color: theme.accent }}>
               {formatPrice(item.price)}
             </p>
             {item.description && (
-              <p className="text-xs text-stone-500 mt-2 max-w-[280px] leading-relaxed line-clamp-2">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 max-w-[280px] leading-relaxed line-clamp-2">
                 {item.description}
               </p>
             )}
           </div>
 
-          {/* Quantity Controls: [-] [ 1 ] [+] (Exact matching reference in Red theme.accent) */}
-          <div className="w-full flex items-center justify-center gap-3.5 pt-1">
-            <MockupMinusButton
+          {/* Quantity Controls: Single unified pill */}
+          <div className="flex items-center justify-center gap-4 bg-zinc-100 dark:bg-zinc-800/80 px-4 py-2 rounded-full w-fit mx-auto">
+            <button
               onClick={handleDec}
-              ariaLabel="Decrease quantity"
-              color={theme.accent}
-              size={38}
-            />
-
-            <div
-              className="w-24 h-[38px] rounded-xl flex items-center justify-center bg-white shadow-xs border-[1.8px]"
-              style={{ borderColor: theme.accent }}
+              aria-label="Decrease quantity"
+              className="p-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors active:scale-90"
             >
-              <span
-                className="text-lg font-bold font-mono"
-                style={{ color: theme.accent }}
-              >
-                {qty}
-              </span>
-            </div>
-
-            <MockupPlusButton
+              <Minus className="w-4 h-4" />
+            </button>
+            <span className="font-bold text-base px-2 text-zinc-900 dark:text-white font-mono min-w-[1.5rem] text-center">
+              {qty}
+            </span>
+            <button
               onClick={handleInc}
-              ariaLabel="Increase quantity"
-              color={theme.accent}
-              size={38}
-            />
+              aria-label="Increase quantity"
+              className="p-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors active:scale-90"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Optional Special Instructions */}
-          <div className="w-full pt-1">
-            <input
-              type="text"
-              placeholder="Add special instructions..."
+          {/* Special Instructions */}
+          <div className="w-full">
+            <input 
+              type="text" 
+              placeholder="Add special instructions..." 
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              className="w-full text-xs bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-stone-800 placeholder:text-stone-400 focus:outline-none transition-colors"
-              style={{ borderColor: theme.accent }}
+              className="w-full text-xs px-3.5 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
             />
           </div>
 
-          {/* Large Pill Add to Cart Button (Themed) */}
+          {/* Large Pill Add to Cart Button (Themed, dynamic total) */}
           <button
             onClick={handleSubmit}
-            className="w-full py-3.5 px-6 rounded-full text-white font-medium text-sm sm:text-base tracking-wide shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-6 rounded-full text-white font-semibold text-sm tracking-wide shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
             style={{ backgroundColor: theme.accent }}
           >
+            <ShoppingCart className="w-4 h-4 opacity-90" />
             <span>Add to Cart</span>
-            <span className="opacity-80 font-mono text-xs">
-              • {formatPrice(Number(item.price) * qty)}
+            <span className="opacity-80 font-mono text-xs ml-0.5">
+              • {formatPrice(totalPrice)}
             </span>
           </button>
         </div>
@@ -739,6 +639,7 @@ function ItemDetailModal({
 function CartDrawer({
   tableNumber,
   theme,
+  currentBrand,
   onSubmit,
   isPending,
   errorMessage,
@@ -746,12 +647,30 @@ function CartDrawer({
 }: {
   tableNumber: string;
   theme: typeof THEMES[Brand];
-  onSubmit: () => void;
+  currentBrand: Brand;
+  onSubmit: (orderType: "dine_in" | "take_out", packagingFee: number, totalAmount: number) => void;
   isPending: boolean;
   errorMessage: string | null;
   onClose: () => void;
 }) {
   const { items, updateQuantity, updateInstructions, totalCount, subtotal } = useCartStore();
+  const [orderType, setOrderType] = useState<"dine_in" | "take_out">("dine_in");
+
+  const isDark = currentBrand === "batchoy-shop";
+  const totalTubs = items.reduce((sum, item) => sum + item.quantity, 0);
+  const packagingFee = orderType === "take_out" ? totalTubs * 10 : 0;
+  const currentSubtotal = subtotal();
+  const totalAmount = currentSubtotal + packagingFee;
+
+  const drawerBg = isDark ? "bg-zinc-950 text-white" : "bg-white text-zinc-900";
+  const borderColor = isDark ? "border-zinc-800" : "border-zinc-200";
+  const itemBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-zinc-50 border-zinc-100";
+  const inputBg = isDark
+    ? "bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
+    : "bg-white border-zinc-200 text-zinc-800 placeholder:text-zinc-400";
+  const emptyTextColor = isDark ? "text-zinc-500" : "text-zinc-400";
+  const footerBg = isDark ? "bg-zinc-900 border-zinc-800" : "bg-zinc-50 border-zinc-100";
+  const subtotalLabel = isDark ? "text-zinc-400" : "text-zinc-500";
 
   return (
     <motion.div
@@ -759,7 +678,7 @@ function CartDrawer({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
@@ -767,36 +686,82 @@ function CartDrawer({
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 28, stiffness: 300 }}
-        className="w-full sm:max-w-md flex flex-col bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl max-h-[90dvh]"
+        className={cn(
+          "w-full sm:max-w-md flex flex-col rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl max-h-[90dvh] border",
+          drawerBg,
+          borderColor
+        )}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile grab handle */}
+        <div className={cn("w-10 h-1 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0", isDark ? "bg-zinc-700" : "bg-zinc-200")} />
+
         {/* Header */}
-        <div className="shrink-0 flex items-center justify-between px-6 pt-5 pb-4 border-b border-stone-100">
+        <div className={cn("shrink-0 flex items-center justify-between px-6 pt-4 pb-4 border-b", borderColor)}>
           <div>
-            <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
+            <h2 className="text-base font-bold flex items-center gap-2">
               <ShoppingCart size={18} style={{ color: theme.accent }} />
               Your Order
               {tableNumber && (
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200">
+                <span
+                  className="text-xs font-semibold px-2.5 py-0.5 rounded-full border"
+                  style={{
+                    backgroundColor: `${theme.accent}18`,
+                    color: theme.accent,
+                    borderColor: `${theme.accent}30`,
+                  }}
+                >
                   Table {tableNumber}
                 </span>
               )}
             </h2>
-            <p className="text-xs text-stone-400 mt-0.5">
+            <p className={cn("text-xs mt-0.5", subtotalLabel)}>
               {totalCount()} item{totalCount() !== 1 ? "s" : ""} · {formatPrice(subtotal())}
             </p>
           </div>
           <button
             onClick={onClose}
             aria-label="Close cart"
-            className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition"
+            className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center transition",
+              isDark
+                ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+                : "bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+            )}
           >
             <X size={15} />
           </button>
         </div>
 
+        {/* Dine-In / Take-Out toggle */}
+        <div className={cn("shrink-0 px-6 pt-4 pb-2")}>
+          <div className={cn("flex rounded-xl p-1 gap-1", isDark ? "bg-zinc-900" : "bg-zinc-100")}>
+            {(["dine_in", "take_out"] as const).map((type) => {
+              const isActive = orderType === type;
+              const label = type === "dine_in" ? "Dine In" : "Take Out";
+              return (
+                <button
+                  key={type}
+                  onClick={() => setOrderType(type)}
+                  className={cn(
+                    "flex-1 py-2 rounded-lg text-xs font-semibold transition-all",
+                    isActive
+                      ? "text-white shadow-sm"
+                      : isDark
+                      ? "text-zinc-400 hover:text-zinc-200"
+                      : "text-zinc-500 hover:text-zinc-700"
+                  )}
+                  style={isActive ? { backgroundColor: theme.accent } : {}}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Scrollable Items */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-3">
           <AnimatePresence initial={false}>
             {items.map((c) => (
               <motion.div
@@ -806,57 +771,70 @@ function CartDrawer({
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="rounded-2xl p-3.5 bg-stone-50 border border-stone-100 space-y-2.5"
+                className={cn("rounded-2xl p-3.5 border space-y-2.5", itemBg)}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-stone-800 truncate">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">
                       {c.menuItem.name}
                     </p>
-                    <p
-                      className="text-xs font-mono font-medium"
-                      style={{ color: theme.accent }}
-                    >
-                      {formatPrice(Number(c.menuItem.price) * c.quantity)}
+                    <p className="text-xs font-mono font-medium mt-0.5" style={{ color: theme.accent }}>
+                      {formatPrice(Number(c.menuItem.price))} ea
                     </p>
+                    {c.specialInstructions && (
+                      <p className={cn("text-[11px] italic mt-1", subtotalLabel)}>
+                        {c.specialInstructions}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <MockupMinusButton
+                  {/* Inline stepper — minus at qty 1 removes the item */}
+                  <div className={cn(
+                    "flex items-center gap-2 shrink-0 rounded-full px-2 py-1",
+                    isDark ? "bg-zinc-800" : "bg-zinc-200/70"
+                  )}>
+                    <button
                       onClick={() => updateQuantity(c.menuItem.id, -1)}
-                      ariaLabel="Decrease quantity"
-                      color={theme.accent}
-                      size={28}
-                    />
+                      aria-label="Decrease quantity"
+                      className="p-0.5 rounded-full transition active:scale-90"
+                      style={{ color: theme.accent }}
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
                     <span
                       className="w-5 text-center text-sm font-bold font-mono"
                       style={{ color: theme.accent }}
                     >
                       {c.quantity}
                     </span>
-                    <MockupPlusButton
+                    <button
                       onClick={() => updateQuantity(c.menuItem.id, 1)}
-                      ariaLabel="Increase quantity"
-                      color={theme.accent}
-                      size={28}
-                    />
+                      aria-label="Increase quantity"
+                      className="p-0.5 rounded-full transition active:scale-90"
+                      style={{ color: theme.accent }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
 
+                {/* Notes input */}
                 <input
                   type="text"
                   placeholder="Special instructions..."
                   value={c.specialInstructions}
                   onChange={(e) => updateInstructions(c.menuItem.id, e.target.value)}
-                  className="w-full text-xs bg-white border border-stone-200 rounded-lg px-3 py-2 outline-none text-stone-800 placeholder:text-stone-400 transition"
-                  style={{ borderColor: theme.accent }}
+                  className={cn(
+                    "w-full text-xs rounded-lg px-3 py-2 outline-none border transition",
+                    inputBg
+                  )}
                 />
               </motion.div>
             ))}
           </AnimatePresence>
 
           {items.length === 0 && (
-            <div className="py-16 text-center text-sm text-stone-400">
+            <div className={cn("py-16 text-center text-sm", emptyTextColor)}>
               Your cart is empty.<br />Select items from the menu to get started.
             </div>
           )}
@@ -864,233 +842,57 @@ function CartDrawer({
 
         {/* Sticky Footer */}
         {items.length > 0 && (
-          <div className="shrink-0 px-6 pt-4 pb-8 bg-stone-50 border-t border-stone-100">
+          <div className={cn("shrink-0 px-6 pt-4 pb-8 border-t", footerBg, borderColor)}>
             {errorMessage && (
-              <p className="mb-3 text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2 border border-red-200">
+              <p className="mb-3 text-xs text-red-500 bg-red-500/10 rounded-xl px-3 py-2 border border-red-500/20">
                 {errorMessage}
               </p>
             )}
-            <div className="flex justify-between items-baseline mb-4 text-stone-900">
-              <span className="text-sm font-medium text-stone-500">Subtotal</span>
-              <span
-                className="text-2xl font-bold font-mono tracking-tight"
-                style={{ color: theme.accent }}
-              >
-                {formatPrice(subtotal())}
-              </span>
+
+            {/* Summary */}
+            <div className={cn("space-y-1.5 mb-4")}>
+              <div className="flex justify-between items-baseline">
+                <span className={cn("text-sm font-medium", subtotalLabel)}>Subtotal</span>
+                <span className="text-sm font-mono font-semibold">{formatPrice(currentSubtotal)}</span>
+              </div>
+
+              {orderType === "take_out" && (
+                <div className="flex justify-between items-baseline text-amber-500">
+                  <span className="text-xs font-semibold">
+                    Packaging Fee (₱10/tub · {totalTubs} {totalTubs === 1 ? "tub" : "tubs"})
+                  </span>
+                  <span className="text-sm font-mono font-bold">+{formatPrice(packagingFee)}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-baseline pt-1 border-t border-dashed border-zinc-700/50">
+                <span className="text-sm font-bold">Total</span>
+                <span
+                  className="text-2xl font-black font-mono tracking-tight"
+                  style={{ color: theme.accent }}
+                >
+                  {formatPrice(totalAmount)}
+                </span>
+              </div>
             </div>
+
             <button
-              onClick={onSubmit}
+              onClick={() => onSubmit(orderType, packagingFee, totalAmount)}
               disabled={isPending}
-              className="w-full py-3.5 rounded-full text-white font-bold text-sm tracking-wide shadow-lg transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-full text-white font-bold text-sm tracking-wide shadow-lg transition active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
               style={{ backgroundColor: theme.accent }}
             >
-              {isPending ? "Sending to Kitchen..." : "Place Order →"}
+              {isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Sending to Kitchen...
+                </>
+              ) : (
+                "Confirm & Send to Kitchen"
+              )}
             </button>
           </div>
         )}
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ─── Receipt Item type for submitted cart snapshot ───────────────────────────
-interface SubmittedReceiptItem {
-  name: string;
-  quantity: number;
-  unitPrice: number;
-  subtotal: number;
-  specialInstructions?: string;
-}
-
-// ─── Order Success Modal (Full Customer Receipt) ─────────────────────────────
-function OrderSuccessModal({
-  order,
-  tableNumber,
-  theme,
-  submittedItems,
-  onClose,
-}: {
-  order: Order;
-  tableNumber: string;
-  theme: typeof THEMES[Brand];
-  submittedItems?: SubmittedReceiptItem[];
-  onClose: () => void;
-}) {
-  // Build receipt line items: prefer server order_items, fallback to cart snapshot
-  const receiptItems: SubmittedReceiptItem[] = (() => {
-    if (order.order_items && order.order_items.length > 0) {
-      return order.order_items.map((oi) => ({
-        name: oi.menu_item_name,
-        quantity: oi.quantity,
-        unitPrice: Number(oi.unit_price),
-        subtotal: Number(oi.subtotal ?? oi.unit_price * oi.quantity),
-        specialInstructions: oi.special_instructions || undefined,
-      }));
-    }
-    if (submittedItems && submittedItems.length > 0) {
-      return submittedItems;
-    }
-    return [];
-  })();
-
-  const orderTime = order.created_at
-    ? new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <motion.div
-        initial={{ y: "100%", opacity: 0.5 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: "100%", opacity: 0 }}
-        transition={{ type: "spring", damping: 28, stiffness: 300 }}
-        className="w-full sm:max-w-sm bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ── Receipt Header ───────────────────────────────── */}
-        <div className="shrink-0 px-6 pt-6 pb-4 text-center space-y-3 border-b border-stone-100">
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
-            <CheckCircle size={24} />
-          </div>
-
-          <div>
-            <h3 className="text-lg font-bold text-stone-900">Order Received!</h3>
-            <p className="text-[11px] text-stone-400 mt-0.5">Your order has been sent to the kitchen</p>
-          </div>
-
-          <div className="flex items-center justify-between px-1">
-            <div className="text-left">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Order</p>
-              <p
-                className="text-xl font-black font-mono tracking-tight"
-                style={{ color: theme.accent }}
-              >
-                #{order.order_number}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-                {tableNumber ? "Table" : "Time"}
-              </p>
-              {tableNumber ? (
-                <p className="text-xl font-black font-mono tracking-tight text-stone-800">
-                  {String(tableNumber).padStart(2, "0")}
-                </p>
-              ) : (
-                <p className="text-sm font-semibold text-stone-600">{orderTime}</p>
-              )}
-            </div>
-          </div>
-
-          {tableNumber && (
-            <p className="text-[11px] text-stone-400">
-              Placed at {orderTime}
-            </p>
-          )}
-        </div>
-
-        {/* ── Scrollable Receipt Items ────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          {receiptItems.length > 0 ? (
-            <div className="space-y-0 divide-y divide-stone-100">
-              {receiptItems.map((item, idx) => (
-                <div key={idx} className="flex items-baseline justify-between gap-3 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-stone-800">
-                      <span
-                        className="font-mono font-bold mr-1.5 text-[13px]"
-                        style={{ color: theme.accent }}
-                      >
-                        {item.quantity}×
-                      </span>
-                      {item.name}
-                    </p>
-                    {item.specialInstructions && (
-                      <p className="text-[11px] text-stone-400 italic mt-0.5 pl-5">
-                        ↳ {item.specialInstructions}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-mono font-semibold text-stone-700">
-                      {formatPrice(item.subtotal)}
-                    </p>
-                    {item.quantity > 1 && (
-                      <p className="text-[10px] text-stone-400 font-mono">
-                        {formatPrice(item.unitPrice)} ea
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="py-4 text-sm text-stone-400 text-center">Order submitted successfully.</p>
-          )}
-        </div>
-
-        {/* ── Receipt Footer: Total & Actions ────────────── */}
-        <div className="shrink-0 px-6 pt-4 pb-7 bg-stone-50/80 border-t border-stone-100 space-y-4">
-          {/* Total */}
-          <div className="flex items-baseline justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-stone-400">
-              Total
-            </span>
-            <span
-              className="text-2xl font-black font-mono tracking-tight"
-              style={{ color: theme.accent }}
-            >
-              {formatPrice(order.total_amount)}
-            </span>
-          </div>
-
-          {/* Cashier instruction */}
-          <div
-            className="rounded-xl px-4 py-2.5 text-center border"
-            style={{
-              backgroundColor: `${theme.accent}08`,
-              borderColor: `${theme.accent}25`,
-            }}
-          >
-            <p className="text-[12px] font-medium text-stone-600 leading-snug">
-              {tableNumber ? (
-                <>
-                  State <strong>Table {String(tableNumber).padStart(2, "0")}</strong> &amp; Order{" "}
-                  <strong>#{order.order_number}</strong> at the cashier when paying.
-                </>
-              ) : (
-                <>
-                  State Order <strong>#{order.order_number}</strong> at the cashier counter when paying.
-                </>
-              )}
-            </p>
-          </div>
-
-          {/* CTA Buttons */}
-          <div className="space-y-2.5">
-            <Link
-              href={`/status?order=${order.id}${tableNumber ? `&table=${encodeURIComponent(tableNumber)}` : ""}`}
-              className="w-full py-3.5 rounded-full text-white text-sm font-semibold transition flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
-              style={{ backgroundColor: theme.accent }}
-            >
-              <ReceiptText size={16} />
-              Track Order Status
-            </Link>
-            <button
-              onClick={onClose}
-              className="w-full py-3 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition active:scale-[0.98]"
-            >
-              Order More
-            </button>
-          </div>
-        </div>
       </motion.div>
     </motion.div>
   );
@@ -1132,6 +934,7 @@ function CustomerMenuContent() {
 
   const [currentBrand, setCurrentBrand] = useState<Brand>(initialBrand);
   const theme = THEMES[currentBrand];
+  const isDark = currentBrand === "batchoy-shop";
 
   // Sync brand with Settings stored in localStorage & listen for admin changes
   useEffect(() => {
@@ -1165,31 +968,13 @@ function CustomerMenuContent() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [brandParam, systemBrand]);
 
-  // View mode: 'cards' (staggered 2-column masonry matching mockup) or 'list'
-  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedMode = localStorage.getItem("kyles_view_mode");
-      if (savedMode === "list" || savedMode === "cards") {
-        setViewMode(savedMode);
-      }
-    }
-  }, []);
-
-  const handleSetViewMode = (mode: "cards" | "list") => {
-    setViewMode(mode);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("kyles_view_mode", mode);
-    }
-  };
-
   const {
     setActiveBrand, setTodayBrand,
-    isCartOpen, setCartOpen, items: cartItems, addItem, clearCart,
+    isCartOpen, setCartOpen, items: cartItems, addItem, updateQuantity, clearCart,
     totalCount, subtotal,
   } = useCartStore();
 
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [menuItems, setMenuItems] = useState<MenuItem[]>(ORIGINAL_MENU);
   const [selectedTableId, setSelectedTableId] = useState<string>("");
 
@@ -1197,8 +982,6 @@ function CustomerMenuContent() {
   const [modalItem, setModalItem] = useState<{ item: MenuItem; imageUrl: string; patternId: string } | null>(null);
 
   const [isPending, startTransition] = useTransition();
-  const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
-  const [submittedReceiptItems, setSubmittedReceiptItems] = useState<SubmittedReceiptItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasActiveOrders, setHasActiveOrders] = useState<boolean>(false);
 
@@ -1301,7 +1084,7 @@ function CustomerMenuContent() {
     }
   });
 
-  const itemsToRender =
+  const baseItems =
     sortedItems.length > 0
       ? sortedItems
       : ORIGINAL_MENU.filter((i) =>
@@ -1310,21 +1093,81 @@ function CustomerMenuContent() {
             : i.brand_schedule === "kyles-eatery"
         );
 
-  const handlePlaceOrder = () => {
+  const itemsToRender = baseItems.filter((item) => {
+    if (selectedCategory === "All") return true;
+    const name = item.name.toLowerCase();
+    const desc = (item.description || "").toLowerCase();
+
+    if (selectedCategory === "Drinks") {
+      return (
+        name.includes("drink") ||
+        name.includes("beverage") ||
+        name.includes("juice") ||
+        name.includes("tea") ||
+        name.includes("soda") ||
+        name.includes("water") ||
+        name.includes("coke") ||
+        name.includes("sprite") ||
+        name.includes("coffee")
+      );
+    }
+
+    if (selectedCategory === "Sides & Rice") {
+      return (
+        name.includes("rice") ||
+        name.includes("side") ||
+        name.includes("salad") ||
+        desc.includes("rice") ||
+        name.includes("egg fried rice") ||
+        name.includes("caesar salad")
+      );
+    }
+
+    if (selectedCategory === "Mains") {
+      const isSideOrRice =
+        name.includes("rice") ||
+        name.includes("salad") ||
+        desc.includes("rice");
+      const isDrink =
+        name.includes("drink") ||
+        name.includes("beverage") ||
+        name.includes("juice") ||
+        name.includes("tea") ||
+        name.includes("soda") ||
+        name.includes("water");
+      return !isSideOrRice && !isDrink;
+    }
+
+    return true;
+  });
+
+  const handlePlaceOrder = (
+    orderType: "dine_in" | "take_out" = "dine_in",
+    _packagingFee: number = 0,
+    _totalAmount?: number
+  ) => {
     if (cartItems.length === 0) return;
     setErrorMessage(null);
     startTransition(async () => {
-      // Capture a snapshot of items for the customer receipt
-      const receiptSnapshot: SubmittedReceiptItem[] = cartItems.map((c) => ({
-        name: c.menuItem.name,
-        quantity: c.quantity,
-        unitPrice: Number(c.menuItem.price),
-        subtotal: +(Number(c.menuItem.price) * c.quantity).toFixed(2),
-        specialInstructions: c.specialInstructions || undefined,
-      }));
+      const itemsSubtotal = cartItems.reduce(
+        (sum, item) => sum + Number(item.menuItem.price) * Number(item.quantity),
+        0
+      );
+      const totalItemCount = cartItems.reduce(
+        (sum, item) => sum + Number(item.quantity),
+        0
+      );
+      const packagingFee = orderType === "take_out" ? totalItemCount * 10 : 0;
+      const grandTotal = itemsSubtotal + packagingFee;
 
       const payload = {
         table_id: selectedTableId || undefined,
+        table_number: rawTableNumber ? parseInt(rawTableNumber, 10) : undefined,
+        brand: currentBrand,
+        order_type: orderType,
+        packaging_fee: packagingFee,
+        subtotal: itemsSubtotal,
+        total_amount: grandTotal,
         customer_name: rawTableNumber ? "Table " + rawTableNumber + " Guest" : "Guest",
         customer_notes: rawTableNumber ? "Table " + rawTableNumber : "",
         items: cartItems.map((c) => ({
@@ -1337,7 +1180,8 @@ function CustomerMenuContent() {
       const result = await createOrderAction(payload);
       if (result.success && result.data) {
         const placed = result.data;
-        setSubmittedReceiptItems(receiptSnapshot);
+
+        // Persist order references locally
         if (typeof window !== "undefined") {
           try {
             localStorage.setItem("kyles_last_order_id", placed.id);
@@ -1351,12 +1195,16 @@ function CustomerMenuContent() {
               ? [...parsedMyOrders, placed.id]
               : [placed.id];
             localStorage.setItem("@kyle_pos_my_orders", JSON.stringify(updatedMyOrders));
-            setHasActiveOrders(true);
           } catch {}
         }
+
+        // Clear cart ONLY after successful insert, then redirect
         clearCart();
         setCartOpen(false);
-        setOrderSuccess(placed);
+        setHasActiveOrders(true);
+
+        const tableParam = rawTableNumber ? `&table=${encodeURIComponent(rawTableNumber)}` : "";
+        router.push(`/status?order=${placed.id}&brand=${currentBrand}${tableParam}`);
       } else {
         setErrorMessage(result.error || "Failed to place order. Please try again.");
       }
@@ -1365,478 +1213,200 @@ function CustomerMenuContent() {
 
   return (
     <div
-      className="min-h-screen w-full flex justify-center items-center py-0 sm:py-6 relative transition-colors duration-500"
-      style={{
-        backgroundImage: `url('${theme.bgPattern}')`,
-        backgroundSize: "400px",
-        backgroundRepeat: "repeat",
-        backgroundColor: theme.bgColor,
-      }}
+      className={cn(
+        "min-h-screen w-full flex flex-col transition-colors duration-300",
+        isDark ? "dark bg-zinc-950 text-white" : "bg-white text-stone-900"
+      )}
     >
-      {/* Pattern definitions */}
+      {/* Pattern definitions for medallions */}
       <JapanesePatternDefs />
 
-      {/* Vignette / dark overlay on large screens */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
-
-      {/* Responsive Screen Container */}
-      <main className="w-full max-w-full sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl min-h-screen sm:min-h-[92vh] sm:my-6 md:my-8 bg-white sm:rounded-[36px] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] flex flex-col relative z-10 overflow-hidden border-0 sm:border border-white/20 transition-all duration-300">
-        
-        {/* Top App Header (Responsive matching mobile & desktop) */}
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-5 sm:px-8 py-3.5 sm:py-4 flex items-center justify-between border-b border-stone-100">
-          {/* Left: Back chevron button + Brand & Table indicator */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => router.back()}
-              aria-label="Back"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-stone-700 hover:bg-stone-100 active:scale-90 transition-transform -ml-1"
-            >
-              <ChevronLeft size={22} strokeWidth={2.2} />
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] sm:text-base font-bold tracking-wide text-stone-800 uppercase block">
-                {theme.brandName}
-              </span>
-              {rawTableNumber && (
-                <span
-                  className="text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider"
-                  style={{ color: theme.accent, backgroundColor: `${theme.accent}15` }}
-                >
-                  Table {rawTableNumber}
+      {/* Main Full-Viewport App Container */}
+      <div className="w-full flex-1 flex flex-col">
+        {/* Top App Header */}
+        <header
+          className={cn(
+            "sticky top-0 z-40 px-4 sm:px-8 py-3.5 sm:py-4 flex items-center justify-between backdrop-blur-md transition-colors",
+            isDark
+              ? "bg-zinc-950/90 border-b border-zinc-800 text-white"
+              : "bg-white/95 border-b border-stone-100 text-stone-900"
+          )}
+        >
+          {/* Left: Brand Logo */}
+          <div className="flex items-center shrink-0 overflow-visible">
+            {currentBrand === "batchoy-shop" ? (
+              <Image
+                src="/batchoy-logo.png"
+                alt="Batchoy Shop"
+                width={160}
+                height={40}
+                className="h-8 w-auto object-contain scale-150 origin-left ml-1"
+                priority
+              />
+            ) : (
+              <div className="flex items-center gap-2 shrink-0">
+                <Image
+                  src="/kyles-logo.jpg"
+                  alt="Kyle's Eatery"
+                  width={34}
+                  height={34}
+                  className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-full shadow-xs object-cover border border-stone-200 shrink-0"
+                  priority
+                />
+                <span className="text-[13px] sm:text-base font-bold tracking-wide text-stone-800 uppercase block">
+                  Kyle&apos;s Eatery
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
-          {/* Center (Desktop only): Section subtitle */}
-          <div className="hidden md:block text-center">
-            <span className="text-xs font-semibold tracking-[0.2em] text-stone-400 uppercase">
-              {theme.title}
-            </span>
+          {/* Middle: Table Pill */}
+          <div className="flex items-center justify-center">
+            {rawTableNumber ? (
+              <span
+                className="text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full uppercase tracking-wider border shadow-xs"
+                style={{
+                  color: theme.accent,
+                  backgroundColor: `${theme.accent}18`,
+                  borderColor: `${theme.accent}30`,
+                }}
+              >
+                Table {rawTableNumber}
+              </span>
+            ) : null}
           </div>
 
-          {/* Right: Receipt tracker connector & Cart */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Right: Receipt / Order Tracker Icon */}
+          <div className="flex items-center justify-end shrink-0">
             <Link
               href={
                 rawTableNumber
-                  ? `/status?table=${encodeURIComponent(rawTableNumber)}`
-                  : `/status`
+                  ? `/status?table=${encodeURIComponent(rawTableNumber)}&brand=${currentBrand}`
+                  : `/status?brand=${currentBrand}`
               }
               aria-label="Order Receipt & Status"
               title="View Digital Receipt"
-              className="relative p-2 rounded-full text-stone-700 hover:bg-stone-100 active:scale-90 transition border border-stone-200/80 sm:border-transparent"
+              className={cn(
+                "relative p-2 rounded-full shrink-0 active:scale-90 transition border",
+                isDark
+                  ? "text-zinc-200 hover:bg-zinc-800 border-zinc-800"
+                  : "text-stone-700 hover:bg-stone-100 border-stone-200/80"
+              )}
             >
-              <ReceiptText size={18} strokeWidth={1.8} />
+              <ReceiptText size={19} strokeWidth={1.8} />
               {hasActiveOrders && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950 animate-pulse" />
               )}
             </Link>
-
-            <button
-              onClick={() => setCartOpen(true)}
-              aria-label="View Cart"
-              className="relative flex items-center gap-2 py-1.5 px-3 sm:px-4 rounded-full border border-stone-200/80 hover:bg-stone-50 active:scale-95 transition shadow-xs"
-            >
-              <ShoppingCart size={16} style={{ color: theme.accent }} />
-              <span className="text-xs sm:text-sm font-semibold text-stone-800 tracking-tight">
-                Cart
-              </span>
-              {totalCount() > 0 && (
-                <span
-                  className="w-5 h-5 text-white text-[11px] font-bold rounded-full flex items-center justify-center font-mono shadow-xs transition-colors"
-                  style={{ backgroundColor: theme.accent }}
-                >
-                  {totalCount()}
-                </span>
-              )}
-              {totalCount() > 0 && (
-                <span
-                  className="hidden sm:inline font-mono text-xs font-bold pl-1.5 border-l border-stone-200"
-                  style={{ color: theme.accent }}
-                >
-                  {formatPrice(subtotal())}
-                </span>
-              )}
-            </button>
           </div>
         </header>
 
-        {/* Section Heading & View Switcher */}
-        <div className="relative px-4 sm:px-8 pt-4 pb-3 flex items-center justify-between">
-          <div className="w-16 sm:w-24 shrink-0" />
-          <div className="text-center flex-1">
-            <h1 className="text-base sm:text-lg md:text-xl font-medium tracking-[0.22em] text-[#374151] uppercase font-sans">
-              {theme.title}
-            </h1>
-          </div>
-          {/* Subtle View Switcher */}
-          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl shrink-0">
-            <button
-              onClick={() => handleSetViewMode("cards")}
-              aria-label="Card View"
-              title="Card View"
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                viewMode === "cards" ? "bg-white text-stone-900 shadow-xs" : "text-stone-400 hover:text-stone-700"
-              )}
-            >
-              <LayoutGrid size={15} />
-              <span className="hidden sm:inline">Cards</span>
-            </button>
-            <button
-              onClick={() => handleSetViewMode("list")}
-              aria-label="List View"
-              title="List View"
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                viewMode === "list" ? "bg-white text-stone-900 shadow-xs" : "text-stone-400 hover:text-stone-700"
-              )}
-            >
-              <Rows3 size={15} />
-              <span className="hidden sm:inline">List</span>
-            </button>
-          </div>
+        {/* Sticky Category Filter Bar */}
+        <div
+          className={cn(
+            "sticky top-[61px] sm:top-[69px] z-30 px-4 sm:px-8 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar backdrop-blur-md transition-colors border-b",
+            isDark
+              ? "bg-zinc-950/80 border-zinc-800 text-white"
+              : "bg-white/80 border-zinc-100 text-zinc-900"
+          )}
+        >
+          {(["All", "Mains", "Sides & Rice", "Drinks"] as const).map((cat) => {
+            const isActive = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={cn(
+                  "shrink-0 transition-all active:scale-95",
+                  isActive
+                    ? currentBrand === "batchoy-shop"
+                      ? "bg-red-600 text-white font-semibold text-xs px-3.5 py-1.5 rounded-full shadow-xs"
+                      : "bg-orange-500 text-white font-semibold text-xs px-3.5 py-1.5 rounded-full shadow-xs"
+                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 text-xs px-3.5 py-1.5 rounded-full font-medium transition-colors"
+                )}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
 
-        {/* The Exact Card View (matching user's attached staggered mockup) OR List View */}
-        {viewMode === "cards" ? (
-          <div className="flex-1 overflow-y-auto px-4 sm:px-8 pb-28 pt-8 sm:pt-10">
-            {/* Mobile (2-column staggered masonry matching user's photo) */}
-            <div className="grid grid-cols-2 gap-3.5 sm:gap-4 md:hidden">
-              <div className="flex flex-col gap-9 sm:gap-10">
-                {itemsToRender
-                  .filter((_, idx) => idx % 2 === 0)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-
-              <div className="flex flex-col gap-9 sm:gap-10 pt-11 sm:pt-12">
-                {itemsToRender
-                  .filter((_, idx) => idx % 2 === 1)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
+        {/* Responsive Food Card Grid with pb-28 bottom scroll clearance */}
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 pb-28 pt-4 sm:pt-6">
+          {itemsToRender.length === 0 ? (
+            <div className="py-20 text-center text-zinc-400 text-sm">
+              No items available in this category.
             </div>
-
-            {/* Tablet (3-column staggered masonry) */}
-            <div className="hidden md:grid lg:hidden md:grid-cols-3 md:gap-5">
-              <div className="flex flex-col gap-10">
-                {itemsToRender
-                  .filter((_, idx) => idx % 3 === 0)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-              <div className="flex flex-col gap-10 pt-8">
-                {itemsToRender
-                  .filter((_, idx) => idx % 3 === 1)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-              <div className="flex flex-col gap-10 pt-14">
-                {itemsToRender
-                  .filter((_, idx) => idx % 3 === 2)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-            </div>
-
-            {/* Desktop & Widescreen (4-column staggered masonry) */}
-            <div className="hidden lg:grid lg:grid-cols-4 lg:gap-6">
-              <div className="flex flex-col gap-10">
-                {itemsToRender
-                  .filter((_, idx) => idx % 4 === 0)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-              <div className="flex flex-col gap-10 pt-7">
-                {itemsToRender
-                  .filter((_, idx) => idx % 4 === 1)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-              <div className="flex flex-col gap-10 pt-14">
-                {itemsToRender
-                  .filter((_, idx) => idx % 4 === 2)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-              <div className="flex flex-col gap-10 pt-7">
-                {itemsToRender
-                  .filter((_, idx) => idx % 4 === 3)
-                  .map((item) => {
-                    const originalIdx = itemsToRender.findIndex((i) => i.id === item.id);
-                    const inCart = cartItems.find((c) => c.menuItem.id === item.id);
-                    const qty = inCart?.quantity || 0;
-                    const basePattern = BASE_PATTERN_NAMES[originalIdx % BASE_PATTERN_NAMES.length];
-                    const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                    const imageUrl = item.image_url || PLACEHOLDER_IMAGES[originalIdx % PLACEHOLDER_IMAGES.length];
-
-                    return (
-                      <SushiCardItem
-                        key={item.id}
-                        item={item}
-                        imageUrl={imageUrl}
-                        patternId={patternId}
-                        theme={theme}
-                        qtyInCart={qty}
-                        onClick={() => setModalItem({ item, imageUrl, patternId })}
-                        onAddClick={(e) => {
-                          e.stopPropagation();
-                          addItem(item, 1);
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* List View (Exact matching mockup: pristine white, no card box, exact spacing) */
-          <div className="flex-1 overflow-y-auto px-2 sm:px-6 lg:px-10 pb-28 pt-2 sm:pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 sm:gap-y-7 max-w-5xl mx-auto">
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
               {itemsToRender.map((item, idx) => {
                 const inCart = cartItems.find((c) => c.menuItem.id === item.id);
                 const qty = inCart?.quantity || 0;
-                const basePattern = BASE_PATTERN_NAMES[idx % BASE_PATTERN_NAMES.length];
+                const imageUrl =
+                  item.image_url ||
+                  PLACEHOLDER_IMAGES[idx % PLACEHOLDER_IMAGES.length];
+                const basePattern =
+                  BASE_PATTERN_NAMES[idx % BASE_PATTERN_NAMES.length];
                 const patternId = `pat-${basePattern}${theme.patternSuffix}`;
-                const imageUrl = item.image_url || PLACEHOLDER_IMAGES[idx % PLACEHOLDER_IMAGES.length];
 
                 return (
-                  <SushiListRow
+                  <ModernFoodCardItem
                     key={item.id}
                     item={item}
                     imageUrl={imageUrl}
-                    patternId={patternId}
-                    theme={theme}
+                    isDark={isDark}
                     qtyInCart={qty}
-                    onClick={() => setModalItem({ item, imageUrl, patternId })}
-                    onAddClick={(e) => {
+                    onIncrement={(e) => {
                       e.stopPropagation();
                       addItem(item, 1);
                     }}
+                    onDecrement={(e) => {
+                      e.stopPropagation();
+                      updateQuantity(item.id, -1);
+                    }}
+                    onClick={() =>
+                      setModalItem({ item, imageUrl, patternId })
+                    }
                   />
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </main>
 
-        {/* Circular Floating Cart Button (FAB) */}
+        {/* Floating Cart Bar */}
         <AnimatePresence>
           {totalCount() > 0 && !isCartOpen && (
-            <motion.button
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 280, damping: 20 }}
-              whileTap={{ scale: 0.9 }}
-              whileHover={{ scale: 1.08 }}
-              onClick={() => setCartOpen(true)}
-              aria-label="View Cart"
-              className="fixed bottom-6 right-6 w-16 h-16 z-50 rounded-full shadow-2xl flex items-center justify-center text-white transition-all duration-200 cursor-pointer"
-              style={{
-                backgroundColor: theme.accent,
-                boxShadow: `0 12px 30px -4px ${theme.accent}66, 0 6px 16px rgba(0,0,0,0.25)`,
-              }}
+            <motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="fixed bottom-5 inset-x-4 max-w-lg mx-auto left-0 right-0 z-40 pointer-events-auto"
             >
-              <ShoppingCart size={26} strokeWidth={2.3} />
-              {/* Notification Badge with Live Count */}
-              <span className="absolute -top-1 -right-1 min-w-[24px] h-6 px-1.5 bg-stone-900 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white shadow-md font-mono">
-                {totalCount()}
-              </span>
-            </motion.button>
+              <button
+                onClick={() => setCartOpen(true)}
+                className={cn(
+                  "w-full py-3.5 px-6 rounded-full text-white font-semibold text-sm flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer",
+                  currentBrand === "batchoy-shop"
+                    ? "bg-red-600 hover:bg-red-700 shadow-xl shadow-red-950/50"
+                    : "bg-orange-500 hover:bg-orange-600 shadow-xl shadow-orange-500/25"
+                )}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center font-mono text-xs font-bold">
+                    {totalCount()}
+                  </span>
+                  <span>View Order</span>
+                </div>
+                <div className="flex items-center gap-2 font-mono text-base font-bold">
+                  <span>{formatPrice(subtotal())}</span>
+                  <ShoppingCart size={18} />
+                </div>
+              </button>
+            </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Active orders indicator */}
-        {hasActiveOrders && (
-          <div className="absolute top-16 right-4 z-30">
-            <Link
-              href={`/status${rawTableNumber ? `?table=${encodeURIComponent(rawTableNumber)}` : ""}`}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900/90 text-white text-[11px] font-medium shadow-lg backdrop-blur-sm hover:bg-stone-900 transition"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Track Orders</span>
-            </Link>
-          </div>
-        )}
 
         {/* Item Detail / Add to Cart Modal (Bottom sheet) */}
         <AnimatePresence>
@@ -1863,6 +1433,7 @@ function CustomerMenuContent() {
             <CartDrawer
               tableNumber={rawTableNumber}
               theme={theme}
+              currentBrand={currentBrand}
               onSubmit={handlePlaceOrder}
               isPending={isPending}
               errorMessage={errorMessage}
@@ -1870,23 +1441,7 @@ function CustomerMenuContent() {
             />
           )}
         </AnimatePresence>
-
-        {/* Success Modal */}
-        <AnimatePresence>
-          {orderSuccess && (
-            <OrderSuccessModal
-              order={orderSuccess}
-              tableNumber={rawTableNumber}
-              theme={theme}
-              submittedItems={submittedReceiptItems}
-              onClose={() => {
-                setOrderSuccess(null);
-                setSubmittedReceiptItems([]);
-              }}
-            />
-          )}
-        </AnimatePresence>
-      </main>
+      </div>
     </div>
   );
 }

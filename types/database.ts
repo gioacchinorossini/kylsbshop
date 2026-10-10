@@ -1,6 +1,6 @@
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled' | 'Archived' | 'archived';
 export type OrderItemStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
-export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
+export type OrderType = 'dine_in' | 'take_out' | 'takeaway' | 'take-out' | 'delivery';
 export type TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning';
 
 export interface Category {
@@ -56,6 +56,10 @@ export interface Order {
   order_type: OrderType;
   status: OrderStatus;
   total_amount: number;
+  packaging_fee?: number | null;
+  payment_method?: 'cash' | 'gcash' | string | null;
+  amount_paid?: number | null;
+  change_given?: number | null;
   customer_name: string | null;
   customer_notes: string | null;
   created_at: string;
@@ -73,7 +77,12 @@ export interface CreateOrderItemInput {
 
 export interface CreateOrderInput {
   table_id?: string;
+  table_number?: number;
+  brand?: string;
   order_type?: OrderType;
+  packaging_fee?: number;
+  subtotal?: number;
+  total_amount?: number;
   customer_name?: string;
   customer_notes?: string;
   items: CreateOrderItemInput[];
